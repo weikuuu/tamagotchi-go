@@ -5,6 +5,7 @@ go 1.26.5
 require (
 	github.com/atotto/clipboard v0.1.4
 	github.com/hajimehoshi/ebiten/v2 v2.9.10
+	golang.org/x/sys v0.44.0
 )
 
 require (
@@ -16,6 +17,5 @@ require (
 	github.com/rivo/uniseg v0.4.7 // indirect
 	golang.org/x/image v0.43.0 // indirect
 	golang.org/x/sync v0.21.0 // indirect
-	golang.org/x/sys v0.44.0 // indirect
 	golang.org/x/text v0.38.0 // indirect
 )

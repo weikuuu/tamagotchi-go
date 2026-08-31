@@ -347,7 +347,8 @@ func (g *overlayGame) Update() error {
 	g.updateCanvasSize()
 	g.handleMouse(now)
 
-	if !g.dragging {
+	sleeping := now.Before(g.sleepUntil)
+	if !g.dragging && !sleeping {
 		dt := 1.0 / float64(ebiten.TPS())
 
 		fleeing := g.fleeFromCursor(now, dt)

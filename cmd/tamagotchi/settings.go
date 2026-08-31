@@ -9,6 +9,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/hajimehoshi/ebiten/v2/vector"
 
+	"tamagotchi/internal/autostart"
 	"tamagotchi/internal/bubblecfg"
 	"tamagotchi/internal/fleecfg"
 	"tamagotchi/internal/overlaycfg"
@@ -58,7 +59,7 @@ const (
 )
 
 func settingsCardRect() image.Rectangle {
-	rows := settingsFieldRows + 3 // + overlay-size stepper, flee toggle, bubble toggle
+	rows := settingsFieldRows + 4 // + overlay-size stepper, flee toggle, bubble toggle, autostart toggle
 	h := settingsTopPad + rows*settingsRowGapY + settingsBottomPad
 	x := (winWidth - settingsCardW) / 2
 	y := (winHeight - h) / 2
@@ -77,6 +78,10 @@ func settingsFleeRowRect(card image.Rectangle) image.Rectangle {
 
 func settingsBubbleRowRect(card image.Rectangle) image.Rectangle {
 	return settingsRowRect(card, settingsFieldRows+2)
+}
+
+func settingsAutostartRowRect(card image.Rectangle) image.Rectangle {
+	return settingsRowRect(card, settingsFieldRows+3)
 }
 
 const settingsStepperBtnW = 32
@@ -160,6 +165,9 @@ func (g *mainGame) updateSettings() {
 	if p.In(settingsToggleRect(settingsBubbleRowRect(card))) {
 		_ = bubblecfg.Save(!bubblecfg.Load())
 	}
+	if p.In(settingsToggleRect(settingsAutostartRowRect(card))) {
+		_ = autostart.SetEnabled(!autostart.Enabled())
+	}
 }
 
 func (g *mainGame) drawSettings(screen *ebiten.Image) {
@@ -190,6 +198,7 @@ func (g *mainGame) drawSettings(screen *ebiten.Image) {
 	g.drawScaleRow(screen, card, hover)
 	drawToggleRow(screen, settingsFleeRowRect(card), hover, "Режим погони (ПКМ по чибику)", fleecfg.Load())
 	drawToggleRow(screen, settingsBubbleRowRect(card), hover, "Облачко с фразами у чибика", bubblecfg.Load())
+	drawToggleRow(screen, settingsAutostartRowRect(card), hover, "Запуск при входе в систему", autostart.Enabled())
 
 	closeR := settingsCloseRect(card)
 	closeBg := color.RGBA{0xA0, 0x8A, 0xE8, 0xFF}
