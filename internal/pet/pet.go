@@ -130,6 +130,9 @@ const (
 	restAffectionGain = 1
 	petAffectionGain  = 1
 	washAffectionGain = 1
+
+	restHungerCost      = 8 // sleeping isn't free — she still gets hungry and a little rumpled
+	restCleanlinessCost = 5
 )
 
 // Feed raises Hunger, as if the pet just ate.
@@ -145,9 +148,12 @@ func (s *State) Play() {
 	s.Affection = (s.Affection + playAffectionGain).clamp()
 }
 
-// Rest raises Energy, as if the pet just slept.
+// Rest raises Energy, as if the pet just slept. Hunger and Cleanliness still
+// tick down while she sleeps — resting isn't a free pause on everything else.
 func (s *State) Rest() {
 	s.Energy = (s.Energy + restEnergyGain).clamp()
+	s.Hunger = (s.Hunger - restHungerCost).clamp()
+	s.Cleanliness = (s.Cleanliness - restCleanlinessCost).clamp()
 	s.Affection = (s.Affection + restAffectionGain).clamp()
 }
 

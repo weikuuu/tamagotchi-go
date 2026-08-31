@@ -42,7 +42,7 @@ func (g *mainGame) settingsRows() []settingsRow {
 	return []settingsRow{
 		{"city", "Город", city},
 		{"username", "Имя", uname},
-		{"birthday", "День рождения (ММ-ДД)", bday},
+		{"birthday", "День рождения (ДД-ММ)", bday},
 		{"spotify", "Spotify Client ID", spot},
 	}
 }

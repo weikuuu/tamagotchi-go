@@ -159,7 +159,7 @@ var stickerMoods = map[pet.Mood]struct {
 		tint:  Tint{0.6, 0.6, 0.7, 1},
 	},
 	pet.MoodSick: {
-		files: []string{"busy.png", "unavailable.gif", "loc.gif"},
+		files: []string{"cross.gif", "unavailable.gif", "loc.gif"},
 		tint:  Tint{0.65, 0.85, 0.65, 1},
 	},
 }
@@ -209,6 +209,18 @@ func LoadStickers() (map[pet.Mood]StickerSet, error) {
 		out[mood] = StickerSet{Anims: anims, Tint: spec.tint}
 	}
 	return out, nil
+}
+
+// LoadSleepSticker decodes the specific sticker that actually depicts
+// Elysia sleeping (as opposed to the rest of the MoodTired set, which is
+// mostly reused general-purpose art with a dim tint), for the desktop
+// overlay to show right after "Спать" is pressed in the main window.
+func LoadSleepSticker() (*gifanim.Animation, error) {
+	data, err := stickersFS.ReadFile("stickers/alternate.gif")
+	if err != nil {
+		return nil, fmt.Errorf("assets: sleep sticker: %w", err)
+	}
+	return gifanim.Decode(data)
 }
 
 func decodePNG(fsys embed.FS, path string) (*ebiten.Image, error) {

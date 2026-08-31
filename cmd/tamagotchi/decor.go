@@ -82,6 +82,33 @@ func drawHeart(screen *ebiten.Image, x, y, size float32, clr color.RGBA) {
 	vector.FillPath(screen, &path, nil, &vector.DrawPathOptions{AntiAlias: true, ColorScale: cs})
 }
 
+// drawSparkle draws a small 4-pointed star, used for the dizzy-shake effect.
+func drawSparkle(screen *ebiten.Image, x, y, size float32, clr color.RGBA) {
+	const points = 4
+	outer, inner := size, size*0.35
+
+	var path vector.Path
+	for i := 0; i < points*2; i++ {
+		angle := float64(i) * math.Pi / points
+		r := outer
+		if i%2 == 1 {
+			r = inner
+		}
+		px := x + float32(math.Cos(angle))*r
+		py := y + float32(math.Sin(angle))*r
+		if i == 0 {
+			path.MoveTo(px, py)
+		} else {
+			path.LineTo(px, py)
+		}
+	}
+	path.Close()
+
+	var cs ebiten.ColorScale
+	cs.ScaleWithColor(clr)
+	vector.FillPath(screen, &path, nil, &vector.DrawPathOptions{AntiAlias: true, ColorScale: cs})
+}
+
 // drawFlower draws a tiny five-petal flower centered at (x, y).
 func drawFlower(screen *ebiten.Image, x, y, size float32, petal color.RGBA) {
 	const petals = 5

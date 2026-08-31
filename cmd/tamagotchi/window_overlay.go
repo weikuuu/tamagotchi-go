@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"image/color"
 	"log"
 	"math"
 	"math/rand"
@@ -17,6 +18,7 @@ import (
 	"tamagotchi/internal/overlaycfg"
 	"tamagotchi/internal/pet"
 	"tamagotchi/internal/phrases"
+	"tamagotchi/internal/sleepcfg"
 	"tamagotchi/internal/uifont"
 )
 
@@ -57,7 +59,20 @@ const (
 	fleeDashDuration  = 110 * time.Millisecond // how long one fast burst lasts
 	fleeDashPause     = 70 * time.Millisecond  // brief freeze between bursts — the "jerky" part
 	fleeSayCooldown   = 3 * time.Second
+
+	// Shaking her while dragging makes her dizzy: track recent drag
+	// movement over shakeWindow, and if the total distance covered
+	// crosses shakeDistanceThreshold, she gets dizzy for dizzyDuration.
+	shakeWindow            = 350 * time.Millisecond
+	shakeDistanceThreshold = 260.0
+	dizzyDuration          = 1400 * time.Millisecond
+	dizzySayCooldown       = 3 * time.Second
 )
+
+type shakeSample struct {
+	t      time.Time
+	dx, dy float64
+}
 
 type overlayGame struct {
 	store   *sharedState
@@ -72,7 +87,8 @@ type overlayGame struct {
 	lastPoll    time.Time
 	lastState   pet.State
 
-	bubbleImg *ebiten.Image
+	bubbleImg    *ebiten.Image
+	sleepSticker *gifanim.Animation
 
 	monitorW, monitorH int
 
@@ -101,6 +117,11 @@ type overlayGame struct {
 	dragAnchorY int
 	petFeedback time.Time
 
+	lastDragX, lastDragY int
+	shakeSamples         []shakeSample // recent per-frame drag movement, for detecting a rapid shake
+	dizzyUntil           time.Time
+	lastDizzySay         time.Time
+
 	bubbleText      string
 	bubbleUntil     time.Time
 	nextAmbient     time.Time
@@ -124,6 +145,8 @@ type overlayGame struct {
 
 	bubbleEnabled bool // if false, she never shows the speech bubble
 	lastPrefsPoll time.Time
+
+	sleepUntil time.Time // set from sleepcfg; forces the yawning sticker while active, mirroring the main window's "Спать" animation
 }
 
 func runOverlay() {
@@ -135,6 +158,10 @@ func runOverlay() {
 	if err != nil {
 		log.Fatalf("overlay: failed to load bubble: %v", err)
 	}
+	sleepSticker, err := assets.LoadSleepSticker()
+	if err != nil {
+		log.Fatalf("overlay: failed to load sleep sticker: %v", err)
+	}
 
 	store, state := openSharedState()
 
@@ -144,7 +171,6 @@ func runOverlay() {
 	ebiten.SetWindowResizable(false)
 	ebiten.SetWindowTitle("Elysia")
 	ebiten.SetScreenClearedEveryFrame(true)
-	ebiten.SetTPS(30) // a desktop pet doesn't need 60fps; halves CPU/GPU load
 
 	mw, mh := ebiten.Monitor().Size()
 	if mw == 0 || mh == 0 {
@@ -157,6 +183,7 @@ func runOverlay() {
 		started:         now,
 		stickers:        stickers,
 		bubbleImg:       bubbleImg,
+		sleepSticker:    sleepSticker,
 		monitorW:        mw,
 		monitorH:        mh,
 		lastState:       state,
@@ -299,6 +326,7 @@ func (g *overlayGame) Update() error {
 		g.lastPrefsPoll = now
 		g.fleeMode = fleecfg.Load()
 		g.bubbleEnabled = bubblecfg.Load()
+		g.sleepUntil = sleepcfg.Load()
 	}
 
 	if !g.nextVariant.IsZero() && now.After(g.nextVariant) {
@@ -484,6 +512,8 @@ func (g *overlayGame) handleMouse(now time.Time) {
 		g.dragging = true
 		g.dragged = false
 		g.dragAnchorX, g.dragAnchorY = mx, my
+		g.lastDragX, g.lastDragY = mx, my
+		g.shakeSamples = g.shakeSamples[:0]
 	}
 	if g.dragging && ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft) {
 		lx, ly := ebiten.CursorPosition()
@@ -495,6 +525,11 @@ func (g *overlayGame) handleMouse(now time.Time) {
 		nx, ny := wx+dx, wy+dy
 		ebiten.SetWindowPosition(nx, ny)
 		g.baseX, g.baseY = float64(nx), float64(ny)
+
+		fdx, fdy := float64(lx-g.lastDragX), float64(ly-g.lastDragY)
+		g.lastDragX, g.lastDragY = lx, ly
+		g.shakeSamples = append(g.shakeSamples, shakeSample{now, fdx, fdy})
+		g.checkShake(now)
 	}
 	if inpututil.IsMouseButtonJustReleased(ebiten.MouseButtonLeft) {
 		if g.dragging && !g.dragged {
@@ -505,7 +540,36 @@ func (g *overlayGame) handleMouse(now time.Time) {
 			g.pauseUntil = time.Time{}
 		}
 		g.dragging = false
+		g.shakeSamples = g.shakeSamples[:0]
 	}
+}
+
+// checkShake looks at recent drag movement and, if it adds up to a lot of
+// back-and-forth distance in a short window (i.e. the pet is being shaken,
+// not just dragged smoothly across the screen), makes her dizzy for a bit.
+func (g *overlayGame) checkShake(now time.Time) {
+	cutoff := now.Add(-shakeWindow)
+	live := g.shakeSamples[:0]
+	var total float64
+	for _, s := range g.shakeSamples {
+		if s.t.Before(cutoff) {
+			continue
+		}
+		live = append(live, s)
+		total += math.Abs(s.dx) + math.Abs(s.dy)
+	}
+	g.shakeSamples = live
+
+	if total < shakeDistanceThreshold {
+		return
+	}
+	if now.Before(g.dizzyUntil) || now.Sub(g.lastDizzySay) < dizzySayCooldown {
+		return
+	}
+	g.dizzyUntil = now.Add(dizzyDuration)
+	g.lastDizzySay = now
+	g.say("Ой-ой-ой!")
+	g.shakeSamples = g.shakeSamples[:0]
 }
 
 func (g *overlayGame) petPet(now time.Time) {
@@ -535,10 +599,14 @@ func (g *overlayGame) setWindowPos(x, y float64) {
 }
 
 func (g *overlayGame) Draw(screen *ebiten.Image) {
-	if g.anim == nil {
+	anim, tint := g.anim, g.tint
+	if time.Now().Before(g.sleepUntil) && g.sleepSticker != nil {
+		anim, tint = g.sleepSticker, assets.Tint{R: 0.85, G: 0.85, B: 0.95, A: 1}
+	}
+	if anim == nil {
 		return
 	}
-	frame := g.anim.FrameAt(time.Since(g.started))
+	frame := anim.FrameAt(time.Since(g.started))
 	fw, fh := frame.Bounds().Dx(), frame.Bounds().Dy()
 
 	scale := math.Min(float64(g.spriteSize)/float64(fw), float64(g.spriteSize)/float64(fh)) * 0.9
@@ -553,11 +621,32 @@ func (g *overlayGame) Draw(screen *ebiten.Image) {
 		(float64(g.spriteSize)-float64(fw)*scale)/2,
 		float64(g.extraTop)+(float64(g.spriteSize)-float64(fh)*scale)/2,
 	)
-	g.tint.Scale(opts)
+	tint.Scale(opts)
 	screen.DrawImage(frame, opts)
+
+	if time.Now().Before(g.dizzyUntil) {
+		g.drawDizzyStars(screen)
+	}
 
 	if !g.dragging && g.bubbleEnabled && time.Now().Before(g.bubbleUntil) {
 		g.drawBubble(screen)
+	}
+}
+
+// drawDizzyStars draws a few little stars orbiting her head while she's
+// dizzy from being shaken.
+func (g *overlayGame) drawDizzyStars(screen *ebiten.Image) {
+	cx := float64(g.spriteSize) / 2
+	cy := float64(g.extraTop) + float64(g.spriteSize)*0.35
+	radius := float64(g.spriteSize) * 0.6
+	t := float64(time.Now().UnixMilli()) / 1000
+
+	const n = 3
+	for i := 0; i < n; i++ {
+		angle := t*5 + float64(i)*(2*math.Pi/n)
+		sx := cx + math.Cos(angle)*radius
+		sy := cy + math.Sin(angle)*radius*0.5
+		drawSparkle(screen, float32(sx), float32(sy), float32(g.spriteSize)*0.1, color.RGBA{0xFF, 0xD9, 0x4A, 0xFF})
 	}
 }
 

@@ -7,8 +7,10 @@ import (
 	"log"
 	"math"
 	"math/rand"
+	"strings"
 	"time"
 
+	"github.com/atotto/clipboard"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/hajimehoshi/ebiten/v2/vector"
@@ -17,6 +19,7 @@ import (
 	"tamagotchi/internal/birthday"
 	"tamagotchi/internal/pet"
 	"tamagotchi/internal/phrases"
+	"tamagotchi/internal/sleepcfg"
 	"tamagotchi/internal/spotify"
 	"tamagotchi/internal/sysinfo"
 	"tamagotchi/internal/uifont"
@@ -51,7 +54,7 @@ const (
 	ambientMinInterval = 12 * time.Second
 	ambientMaxInterval = 25 * time.Second
 
-	sleepAnimDuration = 4 * time.Second // played right after pressing "Спать"
+	sleepAnimDuration = 15 * time.Second // played right after pressing "Спать"
 
 	idleThreshold     = 3 * time.Minute
 	longAbsenceMinGap = 6 * time.Hour
@@ -101,7 +104,7 @@ type mainGame struct {
 
 	sleepUntil time.Time // active right after pressing "Спать"
 
-	birthdayMonthDay string // "MM-DD", loaded once at startup; "" if unset
+	birthdayMonthDay string // "DD-MM", loaded once at startup; "" if unset
 	username         string // loaded once at startup; "" if unset
 
 	bubbleWrapSrc   string   // g.message this cache was computed from
@@ -163,7 +166,8 @@ func runMainWindow() {
 
 	ebiten.SetWindowSize(winWidth, winHeight)
 	ebiten.SetWindowTitle("Elysia — tamagotchi")
-	ebiten.SetWindowResizable(false)
+	ebiten.SetWindowResizable(true)
+	ebiten.SetWindowSizeLimits(winWidth/2, winHeight/2, -1, -1)
 	ebiten.SetTPS(30) // no need for 60fps on a mostly-static stats window; halves CPU/GPU load
 
 	if err := ebiten.RunGame(g); err != nil {
@@ -240,6 +244,7 @@ func (g *mainGame) Update() error {
 			}
 			if b.actionKey == "rest" {
 				g.sleepUntil = now.Add(sleepAnimDuration)
+				_ = sleepcfg.Save(g.sleepUntil)
 			}
 			g.store.save(g.state)
 			break
@@ -283,6 +288,12 @@ func (g *mainGame) Update() error {
 
 func (g *mainGame) updateTextInput() {
 	g.inputBuffer += string(ebiten.AppendInputChars(nil))
+	pasteMod := ebiten.IsKeyPressed(ebiten.KeyControl) || ebiten.IsKeyPressed(ebiten.KeyMeta)
+	if pasteMod && inpututil.IsKeyJustPressed(ebiten.KeyV) {
+		if text, err := clipboard.ReadAll(); err == nil {
+			g.inputBuffer += strings.TrimSpace(text)
+		}
+	}
 	if inpututil.IsKeyJustPressed(ebiten.KeyBackspace) && len(g.inputBuffer) > 0 {
 		r := []rune(g.inputBuffer)
 		g.inputBuffer = string(r[:len(r)-1])
@@ -396,7 +407,7 @@ func (g *mainGame) Draw(screen *ebiten.Image) {
 	}
 
 	barsTop := shellY + shellHeight + 20
-	drawBar(screen, "Голод", float64(g.state.Hunger)/float64(pet.MaxStat), barsTop, color.RGBA{0xE8, 0x8A, 0xB4, 0xFF})
+	drawBar(screen, "Сытость", float64(g.state.Hunger)/float64(pet.MaxStat), barsTop, color.RGBA{0xE8, 0x8A, 0xB4, 0xFF})
 	drawBar(screen, "Энергия", float64(g.state.Energy)/float64(pet.MaxStat), barsTop+barGap, color.RGBA{0x8A, 0xB4, 0xE8, 0xFF})
 	drawBar(screen, "Радость", float64(g.state.Happiness)/float64(pet.MaxStat), barsTop+2*barGap, color.RGBA{0xE8, 0xD8, 0x8A, 0xFF})
 	drawBar(screen, "Чистота", float64(g.state.Cleanliness)/float64(pet.MaxStat), barsTop+3*barGap, color.RGBA{0x8A, 0xD0, 0xC8, 0xFF})
@@ -483,7 +494,7 @@ func (g *mainGame) drawTextInput(screen *ebiten.Image, white ebiten.ColorScale) 
 	case "username":
 		placeholder = "Введите имя и нажмите Enter"
 	case "birthday":
-		placeholder = "Введите день рождения как ММ-ДД и нажмите Enter"
+		placeholder = "Введите день рождения как ДД-ММ и нажмите Enter"
 	case "spotify":
 		placeholder = "Вставьте Spotify Client ID и нажмите Enter"
 	}
