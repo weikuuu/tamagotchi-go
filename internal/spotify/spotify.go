@@ -20,6 +20,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -234,7 +235,9 @@ func (s *Service) authorize() (refreshToken string, err error) {
 		"code_challenge":        {challenge},
 		"scope":                 {scopes},
 	}.Encode()
-	_ = exec.Command("open", authorizeURL).Start()
+	if err := openBrowser(authorizeURL); err != nil {
+		fmt.Fprintf(os.Stderr, "spotify: couldn't open a browser automatically, open this URL yourself:\n%s\n", authorizeURL)
+	}
 
 	var code string
 	select {
@@ -261,6 +264,19 @@ func (s *Service) authorize() (refreshToken string, err error) {
 	s.expiresAt = time.Now().Add(time.Duration(tok.ExpiresIn-30) * time.Second)
 	s.mu.Unlock()
 	return tok.RefreshToken, nil
+}
+
+// openBrowser opens url in the user's default browser, on whichever OS
+// this happens to be running on.
+func openBrowser(url string) error {
+	switch runtime.GOOS {
+	case "darwin":
+		return exec.Command("open", url).Start()
+	case "windows":
+		return exec.Command("rundll32", "url.dll,FileProtocolHandler", url).Start()
+	default: // linux and friends
+		return exec.Command("xdg-open", url).Start()
+	}
 }
 
 func randomVerifier() string {

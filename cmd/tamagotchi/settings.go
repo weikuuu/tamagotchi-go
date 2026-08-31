@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"image"
 	"image/color"
 
@@ -8,6 +9,9 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/hajimehoshi/ebiten/v2/vector"
 
+	"tamagotchi/internal/bubblecfg"
+	"tamagotchi/internal/fleecfg"
+	"tamagotchi/internal/overlaycfg"
 	"tamagotchi/internal/spotify"
 	"tamagotchi/internal/uifont"
 )
@@ -49,14 +53,50 @@ const (
 	settingsRowGapY   = 56 // vertical distance between row centers
 	settingsTopPad    = 54
 	settingsBottomPad = 56
+
+	settingsFieldRows = 4 // city, username, birthday, spotify
 )
 
 func settingsCardRect() image.Rectangle {
-	rows := 4
+	rows := settingsFieldRows + 3 // + overlay-size stepper, flee toggle, bubble toggle
 	h := settingsTopPad + rows*settingsRowGapY + settingsBottomPad
 	x := (winWidth - settingsCardW) / 2
 	y := (winHeight - h) / 2
 	return image.Rect(x, y, x+settingsCardW, y+h)
+}
+
+// settingsScaleRowRect is the row holding the overlay-size stepper, right
+// below the text-field rows.
+func settingsScaleRowRect(card image.Rectangle) image.Rectangle {
+	return settingsRowRect(card, settingsFieldRows)
+}
+
+func settingsFleeRowRect(card image.Rectangle) image.Rectangle {
+	return settingsRowRect(card, settingsFieldRows+1)
+}
+
+func settingsBubbleRowRect(card image.Rectangle) image.Rectangle {
+	return settingsRowRect(card, settingsFieldRows+2)
+}
+
+const settingsStepperBtnW = 32
+
+func settingsScaleMinusRect(row image.Rectangle) image.Rectangle {
+	y := row.Min.Y + 20
+	return image.Rect(row.Min.X, y, row.Min.X+settingsStepperBtnW, y+24)
+}
+
+func settingsScalePlusRect(row image.Rectangle) image.Rectangle {
+	y := row.Min.Y + 20
+	return image.Rect(row.Max.X-settingsStepperBtnW, y, row.Max.X, y+24)
+}
+
+// settingsToggleRect is the clickable on/off pill on the right side of a
+// toggle row (flee mode, bubble on/off).
+func settingsToggleRect(row image.Rectangle) image.Rectangle {
+	w, h := 90, 26
+	y := row.Min.Y + (row.Dy()-h)/2 + 6
+	return image.Rect(row.Max.X-w, y, row.Max.X, y+h)
 }
 
 func settingsRowRect(card image.Rectangle, i int) image.Rectangle {
@@ -105,6 +145,21 @@ func (g *mainGame) updateSettings() {
 			return
 		}
 	}
+
+	scaleRow := settingsScaleRowRect(card)
+	switch {
+	case p.In(settingsScaleMinusRect(scaleRow)):
+		_ = overlaycfg.Save(overlaycfg.Clamp(overlaycfg.Load() - overlaycfg.Step))
+	case p.In(settingsScalePlusRect(scaleRow)):
+		_ = overlaycfg.Save(overlaycfg.Clamp(overlaycfg.Load() + overlaycfg.Step))
+	}
+
+	if p.In(settingsToggleRect(settingsFleeRowRect(card))) {
+		_ = fleecfg.Save(!fleecfg.Load())
+	}
+	if p.In(settingsToggleRect(settingsBubbleRowRect(card))) {
+		_ = bubblecfg.Save(!bubblecfg.Load())
+	}
 }
 
 func (g *mainGame) drawSettings(screen *ebiten.Image) {
@@ -132,6 +187,10 @@ func (g *mainGame) drawSettings(screen *ebiten.Image) {
 		uifont.Draw(screen, row.value, 14, float64(r.Min.X+10), float64(r.Min.Y+22), bubbleInkColor())
 	}
 
+	g.drawScaleRow(screen, card, hover)
+	drawToggleRow(screen, settingsFleeRowRect(card), hover, "Режим погони (ПКМ по чибику)", fleecfg.Load())
+	drawToggleRow(screen, settingsBubbleRowRect(card), hover, "Облачко с фразами у чибика", bubblecfg.Load())
+
 	closeR := settingsCloseRect(card)
 	closeBg := color.RGBA{0xA0, 0x8A, 0xE8, 0xFF}
 	if hover.In(closeR) {
@@ -140,4 +199,55 @@ func (g *mainGame) drawSettings(screen *ebiten.Image) {
 	vector.DrawFilledRect(screen, float32(closeR.Min.X), float32(closeR.Min.Y), float32(closeR.Dx()), float32(closeR.Dy()), closeBg, true)
 	var white ebiten.ColorScale
 	uifont.DrawCentered(screen, "Закрыть", 14, float64(closeR.Min.X+closeR.Dx()/2), float64(closeR.Min.Y+10), white)
+}
+
+// drawScaleRow renders the "−  120%  +" stepper that resizes the desktop
+// overlay (a separate process — it picks the new size up within a second
+// via overlaycfg).
+func (g *mainGame) drawScaleRow(screen *ebiten.Image, card image.Rectangle, hover image.Point) {
+	ink := inkColor()
+	r := settingsScaleRowRect(card)
+	vector.DrawFilledRect(screen, float32(r.Min.X), float32(r.Min.Y), float32(r.Dx()), float32(r.Dy()), color.RGBA{0xFF, 0xFF, 0xFF, 0xB0}, true)
+	vector.StrokeRect(screen, float32(r.Min.X), float32(r.Min.Y), float32(r.Dx()), float32(r.Dy()), 1, color.RGBA{0xC9, 0x7A, 0xA6, 0xB0}, true)
+	uifont.Draw(screen, "Размер летающей Элизии", 12, float64(r.Min.X+10), float64(r.Min.Y+5), ink)
+
+	scale := overlaycfg.Load()
+
+	drawStepperBtn := func(br image.Rectangle, label string) {
+		bg := color.RGBA{0xA0, 0x8A, 0xE8, 0xFF}
+		if hover.In(br) {
+			bg = lighten(bg)
+		}
+		vector.DrawFilledRect(screen, float32(br.Min.X), float32(br.Min.Y), float32(br.Dx()), float32(br.Dy()), bg, true)
+		var white ebiten.ColorScale
+		uifont.DrawCentered(screen, label, 14, float64(br.Min.X+br.Dx()/2), float64(br.Min.Y+4), white)
+	}
+	drawStepperBtn(settingsScaleMinusRect(r), "−")
+	drawStepperBtn(settingsScalePlusRect(r), "+")
+
+	pct := fmt.Sprintf("%.0f%%", scale*100)
+	uifont.DrawCentered(screen, pct, 14, float64(r.Min.X+r.Dx()/2), float64(r.Min.Y+22), bubbleInkColor())
+}
+
+// drawToggleRow renders a labeled row with an "Вкл"/"Выкл" pill on the
+// right; used for the flee-mode and bubble-visibility settings.
+func drawToggleRow(screen *ebiten.Image, r image.Rectangle, hover image.Point, label string, on bool) {
+	ink := inkColor()
+	vector.DrawFilledRect(screen, float32(r.Min.X), float32(r.Min.Y), float32(r.Dx()), float32(r.Dy()), color.RGBA{0xFF, 0xFF, 0xFF, 0xB0}, true)
+	vector.StrokeRect(screen, float32(r.Min.X), float32(r.Min.Y), float32(r.Dx()), float32(r.Dy()), 1, color.RGBA{0xC9, 0x7A, 0xA6, 0xB0}, true)
+	uifont.Draw(screen, label, 12, float64(r.Min.X+10), float64(r.Min.Y+5), ink)
+
+	tr := settingsToggleRect(r)
+	bg := color.RGBA{0xB0, 0xB0, 0xB0, 0xFF}
+	text := "Выкл"
+	if on {
+		bg = color.RGBA{0x8A, 0xD0, 0xC8, 0xFF}
+		text = "Вкл"
+	}
+	if hover.In(tr) {
+		bg = lighten(bg)
+	}
+	vector.DrawFilledRect(screen, float32(tr.Min.X), float32(tr.Min.Y), float32(tr.Dx()), float32(tr.Dy()), bg, true)
+	var white ebiten.ColorScale
+	uifont.DrawCentered(screen, text, 13, float64(tr.Min.X+tr.Dx()/2), float64(tr.Min.Y+5), white)
 }

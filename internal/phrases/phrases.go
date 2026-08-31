@@ -36,6 +36,9 @@ const (
 	Birthday       Category = "birthday"        // special event
 	NewYear        Category = "new_year"        // special event
 	Streak         Category = "streak"          // long run without neglect
+	Flee           Category = "flee"            // darting away from the cursor
+	FleeToggleOn   Category = "flee_toggle_on"  // "chase me" mode just turned on
+	FleeToggleOff  Category = "flee_toggle_off" // "chase me" mode just turned off
 )
 
 var byCategory = map[Category][]string{
@@ -275,6 +278,28 @@ var byCategory = map[Category][]string{
 		"Я тобой горжусь~",
 		"Вот это команда!",
 	},
+	Flee: {
+		"Ай, не поймаешь! ♪",
+		"Пятнашки? Я в деле~ ♪",
+		"Ускользаю! Хи-хи~",
+		"Слишком медленно!",
+		"А вот и не поймал!",
+		"Куда я, туда и ты? Забавно~",
+		"Догоняй, если сможешь! ♪",
+		"Уииии, погоня!",
+	},
+	FleeToggleOn: {
+		"Ловишки! Попробуй меня поймать~ ♪",
+		"Хи-хи, теперь я буду убегать!",
+		"Игра в догонялки началась!",
+		"Ну попробуй поймай меня~",
+	},
+	FleeToggleOff: {
+		"Ладно, больше не буду убегать~",
+		"Уф, устала бегать. Отдохнём?",
+		"Хорошо, я снова смирная~",
+		"На сегодня погоня окончена.",
+	},
 	Music: {
 		"Какая приятная музыка~ ♪",
 		"Мне нравится эта мелодия! ♪",
@@ -339,60 +364,92 @@ func Get(c Category) string {
 	return pick(byCategory[c])
 }
 
+// shortMaxLen is the longest a line can be (in runes) to qualify for
+// GetShort/ForStateShort/ForActionShort — tuned to what actually fits in
+// the tiny desktop-overlay speech bubble, which is much smaller than the
+// one in the main window.
+const shortMaxLen = 34
+
+// GetShort returns a random SHORT line from the given category, for
+// display spots too small for the full-length lines (the desktop
+// overlay's bubble). Falls back to the shortest available line in the
+// category if none qualify.
+func GetShort(c Category) string {
+	return pickShort(byCategory[c])
+}
+
 // ForState picks an ambient line fitting the pet's current stats: mostly
 // mood-driven, with a chance of a HighFriendship line when things are going
 // especially well and a small chance of a rare Ultra line at any time.
 func ForState(s pet.State) string {
+	return forStateWith(s, Get)
+}
+
+// ForStateShort is ForState using only short lines; see GetShort.
+func ForStateShort(s pet.State) string {
+	return forStateWith(s, GetShort)
+}
+
+func forStateWith(s pet.State, get func(Category) string) string {
 	if rand.Float64() < ultraChance {
-		return Get(Ultra)
+		return get(Ultra)
 	}
 	if s.IsDirty() && rand.Float64() < 0.5 {
-		return Get(Dirty)
+		return get(Dirty)
 	}
 	if s.Hunger >= highFriendshipThreshold && s.Energy >= highFriendshipThreshold &&
 		s.Happiness >= highFriendshipThreshold && rand.Float64() < 0.3 {
-		return Get(HighFriendship)
+		return get(HighFriendship)
 	}
 	switch s.Mood() {
 	case pet.MoodHappy:
 		if rand.Float64() < 0.35 {
-			return Get(Random)
+			return get(Random)
 		}
-		return Get(Happy)
+		return get(Happy)
 	case pet.MoodContent:
-		return Get(Random)
+		return get(Random)
 	case pet.MoodBored:
-		return Get(WantPlay)
+		return get(WantPlay)
 	case pet.MoodSad:
 		if rand.Float64() < 0.4 {
-			return Get(Upset)
+			return get(Upset)
 		}
-		return Get(Sad)
+		return get(Sad)
 	case pet.MoodHungry:
-		return Get(Hungry)
+		return get(Hungry)
 	case pet.MoodTired:
-		return Get(Sleepy)
+		return get(Sleepy)
 	case pet.MoodSick:
-		return Get(Sick)
+		return get(Sick)
 	default:
-		return Get(Random)
+		return get(Random)
 	}
 }
 
 // ForAction returns a reaction line for a named action
-// ("feed", "play", or "rest").
+// ("feed", "play", "rest", or "wash").
 func ForAction(action string, s pet.State) string {
+	return forActionWith(action, s, Get)
+}
+
+// ForActionShort is ForAction using only short lines; see GetShort.
+func ForActionShort(action string, s pet.State) string {
+	return forActionWith(action, s, GetShort)
+}
+
+func forActionWith(action string, s pet.State, get func(Category) string) string {
 	switch action {
 	case "feed":
-		return Get(AfterEat)
+		return get(AfterEat)
 	case "play":
-		return Get(AfterPlay)
+		return get(AfterPlay)
 	case "rest":
-		return Get(WakeUp)
+		return get(WakeUp)
 	case "wash":
-		return Get(Dirty)
+		return get(Dirty)
 	default:
-		return ForState(s)
+		return forStateWith(s, get)
 	}
 }
 
@@ -401,4 +458,27 @@ func pick(lines []string) string {
 		return ""
 	}
 	return lines[rand.Intn(len(lines))]
+}
+
+// pickShort picks among lines no longer than shortMaxLen runes. If none
+// qualify, it falls back to the single shortest line so callers always get
+// something reasonably compact.
+func pickShort(lines []string) string {
+	if len(lines) == 0 {
+		return ""
+	}
+	var candidates []string
+	shortest := lines[0]
+	for _, l := range lines {
+		if len([]rune(l)) <= shortMaxLen {
+			candidates = append(candidates, l)
+		}
+		if len([]rune(l)) < len([]rune(shortest)) {
+			shortest = l
+		}
+	}
+	if len(candidates) == 0 {
+		return shortest
+	}
+	return candidates[rand.Intn(len(candidates))]
 }

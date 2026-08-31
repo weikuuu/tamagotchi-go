@@ -90,8 +90,8 @@ func NewState(now time.Time) State {
 }
 
 const (
-	hungerDecayPerHour      = 240.0 // 100 (full) -> 0 in 25 minutes
-	energyDecayPerHour      = 4.0
+	hungerDecayPerHour      = 240.0     // 100 (full) -> 0 in 25 minutes
+	energyDecayPerHour      = 300.0     // 100 (full) -> 0 in 20 minutes
 	happinessDecayPerHour   = 480.0     // 100 (full) -> 0 in 12.5 minutes
 	cleanlinessDecayPerHour = 100.0 / 8 // 100 (full) -> 0 in 8 hours
 )

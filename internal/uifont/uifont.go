@@ -17,12 +17,22 @@ import (
 )
 
 // candidatePaths are tried in order; the first one that exists and parses
-// as a valid font is used. All are macOS system fonts with full Cyrillic
-// coverage, so nothing needs to be bundled or downloaded.
+// as a valid font is used. All are OS-provided fonts with full Cyrillic
+// coverage, so nothing needs to be bundled or downloaded — covers macOS,
+// Windows, and common Linux setups.
 var candidatePaths = []string{
+	// macOS
 	"/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
 	"/System/Library/Fonts/SFNS.ttf",
 	"/System/Library/Fonts/Supplemental/Tahoma.ttf",
+	// Windows
+	`C:\Windows\Fonts\segoeui.ttf`,
+	`C:\Windows\Fonts\arial.ttf`,
+	`C:\Windows\Fonts\tahoma.ttf`,
+	// Linux (varies by distro; try the common ones)
+	"/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+	"/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+	"/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
 }
 
 var (
