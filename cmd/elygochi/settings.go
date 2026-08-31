@@ -13,7 +13,6 @@ import (
 	"elygochi/internal/bubblecfg"
 	"elygochi/internal/fleecfg"
 	"elygochi/internal/overlaycfg"
-	"elygochi/internal/spotify"
 	"elygochi/internal/uifont"
 )
 
@@ -36,15 +35,10 @@ func (g *mainGame) settingsRows() []settingsRow {
 	if bday == "" {
 		bday = "не указан"
 	}
-	spot := "не подключён"
-	if spotify.ClientID() != "" {
-		spot = "подключён"
-	}
 	return []settingsRow{
 		{"city", "Город", city},
 		{"username", "Имя", uname},
 		{"birthday", "День рождения (ДД-ММ)", bday},
-		{"spotify", "Spotify Client ID", spot},
 	}
 }
 
@@ -55,7 +49,7 @@ const (
 	settingsTopPad    = 54
 	settingsBottomPad = 56
 
-	settingsFieldRows = 4 // city, username, birthday, spotify
+	settingsFieldRows = 3 // city, username, birthday
 )
 
 func settingsCardRect() image.Rectangle {
@@ -144,8 +138,6 @@ func (g *mainGame) updateSettings() {
 				g.inputBuffer = g.username
 			case "birthday":
 				g.inputBuffer = g.birthdayMonthDay
-			case "spotify":
-				g.inputBuffer = spotify.ClientID()
 			}
 			return
 		}

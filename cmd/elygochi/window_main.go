@@ -101,7 +101,7 @@ type mainGame struct {
 	sysinfo *sysinfo.Service
 	spotify *spotify.Service
 
-	editField    string // "" | "city" | "username" | "birthday" | "spotify" — which text field is being edited
+	editField    string // "" | "city" | "username" | "birthday" — which text field is being edited
 	inputBuffer  string
 	showSettings bool
 	miniGame     *miniGameState // non-nil while the "catch the hearts" mini-game is open
@@ -384,9 +384,6 @@ func (g *mainGame) updateTextInput() {
 				} else if err := birthday.Save(g.inputBuffer); err == nil {
 					g.birthdayMonthDay = g.inputBuffer
 				}
-			case "spotify":
-				_ = spotify.SaveClientID(g.inputBuffer)
-				g.spotify = spotify.Start()
 			}
 		}
 		g.editField = ""
@@ -705,8 +702,6 @@ func (g *mainGame) drawTextInput(screen *ebiten.Image, white ebiten.ColorScale) 
 		placeholder = "Введите имя и нажмите Enter"
 	case "birthday":
 		placeholder = "Введите день рождения как ДД-ММ и нажмите Enter"
-	case "spotify":
-		placeholder = "Вставьте Spotify Client ID и нажмите Enter"
 	}
 
 	text := g.inputBuffer
