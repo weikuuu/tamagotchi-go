@@ -11,8 +11,8 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/hajimehoshi/ebiten/v2/vector"
 
-	"tamagotchi/internal/phrases"
-	"tamagotchi/internal/uifont"
+	"elygochi/internal/phrases"
+	"elygochi/internal/uifont"
 )
 
 // A short "catch the hearts" mini-game: pixel-art hearts pop up at random

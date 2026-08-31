@@ -6,8 +6,8 @@ import (
 	"os"
 	"time"
 
-	"tamagotchi/internal/pet"
-	"tamagotchi/internal/statepath"
+	"elygochi/internal/pet"
+	"elygochi/internal/statepath"
 )
 
 // sharedState wraps the pet save file so both the main window and the

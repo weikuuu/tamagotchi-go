@@ -1,15 +1,15 @@
 #!/bin/sh
-# Builds "Elysia Tamagochi.app", a normal double-clickable macOS app —
+# Builds "Elygochi.app", a normal double-clickable macOS app —
 # no terminal needed to run it afterwards.
 #
 # Usage: ./scripts/build_macos_app.sh
-# Output: ./Elysia Tamagochi.app (repo root)
+# Output: ./Elygochi.app (repo root)
 
 set -e
 
 cd "$(dirname "$0")/.."
 
-APP="Elysia Tamagochi.app"
+APP="Elygochi.app"
 CONTENTS="$APP/Contents"
 MACOS="$CONTENTS/MacOS"
 RESOURCES="$CONTENTS/Resources"
@@ -18,7 +18,7 @@ rm -rf "$APP"
 mkdir -p "$MACOS" "$RESOURCES"
 
 echo "Building binary..."
-go build -o "$MACOS/tamagotchi" ./cmd/tamagotchi
+go build -o "$MACOS/elygochi" ./cmd/elygochi
 
 echo "Building app icon..."
 ICONSET=$(mktemp -d)/AppIcon.iconset
@@ -37,11 +37,11 @@ cat > "$CONTENTS/Info.plist" <<'EOF'
 <plist version="1.0">
 <dict>
 	<key>CFBundleName</key>
-	<string>Elysia Tamagochi</string>
+	<string>Elygochi</string>
 	<key>CFBundleDisplayName</key>
-	<string>Elysia Tamagochi</string>
+	<string>Elygochi</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.tamagotchi.elysia</string>
+	<string>com.elygochi.elysia</string>
 	<key>CFBundleVersion</key>
 	<string>1.0</string>
 	<key>CFBundleShortVersionString</key>
@@ -49,7 +49,7 @@ cat > "$CONTENTS/Info.plist" <<'EOF'
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleExecutable</key>
-	<string>tamagotchi</string>
+	<string>elygochi</string>
 	<key>CFBundleIconFile</key>
 	<string>AppIcon</string>
 	<key>NSHighResolutionCapable</key>

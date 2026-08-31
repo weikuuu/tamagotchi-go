@@ -26,7 +26,7 @@ import (
 	"sync"
 	"time"
 
-	"tamagotchi/internal/spotifylocal"
+	"elygochi/internal/spotifylocal"
 )
 
 const (
@@ -331,7 +331,7 @@ func configDir() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	dir = filepath.Join(dir, "tamagotchi")
+	dir = filepath.Join(dir, "elygochi")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", err
 	}

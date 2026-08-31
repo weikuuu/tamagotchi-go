@@ -1,4 +1,4 @@
-// Package statepath locates the on-disk file where the tamagotchi's save
+// Package statepath locates the on-disk file where the elygochi's save
 // state lives, shared between the main window and the desktop overlay.
 package statepath
 
@@ -14,7 +14,7 @@ func Default() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	dir = filepath.Join(dir, "tamagotchi")
+	dir = filepath.Join(dir, "elygochi")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", err
 	}

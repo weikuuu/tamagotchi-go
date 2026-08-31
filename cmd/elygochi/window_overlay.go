@@ -11,15 +11,15 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 
-	"tamagotchi/internal/assets"
-	"tamagotchi/internal/bubblecfg"
-	"tamagotchi/internal/fleecfg"
-	"tamagotchi/internal/gifanim"
-	"tamagotchi/internal/overlaycfg"
-	"tamagotchi/internal/pet"
-	"tamagotchi/internal/phrases"
-	"tamagotchi/internal/sleepcfg"
-	"tamagotchi/internal/uifont"
+	"elygochi/internal/assets"
+	"elygochi/internal/bubblecfg"
+	"elygochi/internal/fleecfg"
+	"elygochi/internal/gifanim"
+	"elygochi/internal/overlaycfg"
+	"elygochi/internal/pet"
+	"elygochi/internal/phrases"
+	"elygochi/internal/sleepcfg"
+	"elygochi/internal/uifont"
 )
 
 // Base dimensions at overlaycfg scale 1.0. The overlay's actual on-screen

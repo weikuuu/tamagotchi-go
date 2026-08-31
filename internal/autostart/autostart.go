@@ -12,7 +12,7 @@ import (
 	"runtime"
 )
 
-const label = "com.tamagotchi.elysia"
+const label = "com.elygochi.elysia"
 
 // Supported reports whether this OS has an autostart implementation.
 func Supported() bool {

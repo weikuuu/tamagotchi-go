@@ -1,4 +1,4 @@
-// Command tamagotchi runs the Elysia desktop tamagotchi: a main window for
+// Command elygochi runs the Elysia desktop elygochi: a main window for
 // feeding/playing/resting the pet, plus a transparent overlay that lets the
 // pet fly around the desktop. The two windows are separate OS processes
 // (Ebitengine only supports one window per process) kept in sync through a

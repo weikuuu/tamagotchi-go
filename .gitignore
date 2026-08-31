@@ -1,7 +1,8 @@
 /Elysia Tamagotchi.app/
 /Elysia Tamagochi.app/
+/Elygochi.app/
 /dist/
 *.dSYM/
-/tamagotchi
-/tamagotchi-bin
+/elygochi
+/elygochi-bin
 .DS_Store

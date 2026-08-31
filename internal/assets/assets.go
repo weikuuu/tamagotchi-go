@@ -1,4 +1,4 @@
-// Package assets embeds the tamagotchi's art and maps it onto moods.
+// Package assets embeds the elygochi's art and maps it onto moods.
 //
 // The source art (fan illustrations of Elysia and a chibi sticker pack)
 // wasn't drawn with these specific moods in mind, so most of it reads as
@@ -16,8 +16,8 @@ import (
 
 	"github.com/hajimehoshi/ebiten/v2"
 
-	"tamagotchi/internal/gifanim"
-	"tamagotchi/internal/pet"
+	"elygochi/internal/gifanim"
+	"elygochi/internal/pet"
 )
 
 //go:embed portraits
@@ -36,11 +36,18 @@ var appIconFS embed.FS
 var easterEggFS embed.FS
 
 // Frame layout, in the coordinate space of the shell.png asset itself
-// (1040x1112). ScreenRect is the pixel rectangle of the shell's screen
+// (1254x1254). ScreenRect is the pixel rectangle of the shell's screen
 // cutout, where the portrait should be composited.
-var ScreenRect = image.Rect(273, 345, 756, 768)
+var ScreenRect = image.Rect(395, 495, 870, 885)
 
-// LoadFrame decodes the tamagotchi shell artwork that the portrait sits
+// ShellNativeW and ShellNativeH are shell.png's own pixel dimensions —
+// ScreenRect and any other shell-relative coordinates are in this space.
+const (
+	ShellNativeW = 1254
+	ShellNativeH = 1254
+)
+
+// LoadFrame decodes the elygochi shell artwork that the portrait sits
 // inside.
 func LoadFrame() (*ebiten.Image, error) {
 	return decodePNG(frameFS, "frame/shell.png")

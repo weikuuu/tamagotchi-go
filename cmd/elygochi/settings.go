@@ -9,12 +9,12 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/hajimehoshi/ebiten/v2/vector"
 
-	"tamagotchi/internal/autostart"
-	"tamagotchi/internal/bubblecfg"
-	"tamagotchi/internal/fleecfg"
-	"tamagotchi/internal/overlaycfg"
-	"tamagotchi/internal/spotify"
-	"tamagotchi/internal/uifont"
+	"elygochi/internal/autostart"
+	"elygochi/internal/bubblecfg"
+	"elygochi/internal/fleecfg"
+	"elygochi/internal/overlaycfg"
+	"elygochi/internal/spotify"
+	"elygochi/internal/uifont"
 )
 
 type settingsRow struct {

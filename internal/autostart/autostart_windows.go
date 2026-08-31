@@ -8,7 +8,7 @@ import (
 	"golang.org/x/sys/windows/registry"
 )
 
-const runValueName = "ElysiaTamagotchi"
+const runValueName = "ElysiaElygochi"
 
 func windowsEnabled() bool {
 	k, err := registry.OpenKey(registry.CURRENT_USER, `Software\Microsoft\Windows\CurrentVersion\Run`, registry.QUERY_VALUE)

@@ -1,4 +1,4 @@
-// Package pet implements the tamagotchi's core simulation state:
+// Package pet implements the elygochi's core simulation state:
 // stats, time-based degradation, mood, and persistence.
 package pet
 
@@ -63,7 +63,7 @@ func (m Mood) String() string {
 // criticalThreshold marks a stat as critically low.
 const criticalThreshold = 20
 
-// State is the tamagotchi's full simulation state.
+// State is the elygochi's full simulation state.
 type State struct {
 	Hunger      Stat      `json:"hunger"`      // 0 = starving, 100 = full
 	Energy      Stat      `json:"energy"`      // 0 = exhausted, 100 = rested

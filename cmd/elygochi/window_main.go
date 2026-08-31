@@ -16,16 +16,16 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/hajimehoshi/ebiten/v2/vector"
 
-	"tamagotchi/internal/assets"
-	"tamagotchi/internal/birthday"
-	"tamagotchi/internal/pet"
-	"tamagotchi/internal/phrases"
-	"tamagotchi/internal/sleepcfg"
-	"tamagotchi/internal/spotify"
-	"tamagotchi/internal/sysinfo"
-	"tamagotchi/internal/uifont"
-	"tamagotchi/internal/username"
-	"tamagotchi/internal/weather"
+	"elygochi/internal/assets"
+	"elygochi/internal/birthday"
+	"elygochi/internal/pet"
+	"elygochi/internal/phrases"
+	"elygochi/internal/sleepcfg"
+	"elygochi/internal/spotify"
+	"elygochi/internal/sysinfo"
+	"elygochi/internal/uifont"
+	"elygochi/internal/username"
+	"elygochi/internal/weather"
 )
 
 const (
@@ -39,7 +39,7 @@ const (
 	nowPlayingY      = infoBarHeight + 4
 	nowPlayingHeight = 24 // dedicated row for "what's playing", separate from the crowded info bar
 
-	shellWidth = 440 // the tamagotchi shell art is scaled to this width
+	shellWidth = 440 // the elygochi shell art is scaled to this width
 	shellX     = (winWidth - shellWidth) / 2
 	shellY     = nowPlayingY + nowPlayingHeight + 12
 
@@ -71,10 +71,10 @@ const (
 // instead of being logged like a real failure.
 var errQuit = errors.New("closed by user")
 
-// shellHeight is derived from the source art's aspect ratio (1040x1112).
+// shellHeight is derived from the source art's aspect ratio.
 var shellHeight = func() int {
 	w := float64(shellWidth)
-	return int(w * 1112 / 1040)
+	return int(w * assets.ShellNativeH / assets.ShellNativeW)
 }()
 
 type button struct {
@@ -188,7 +188,7 @@ func runMainWindow() {
 	}
 
 	ebiten.SetWindowSize(winWidth, winHeight)
-	ebiten.SetWindowTitle("Elysia — tamagochi")
+	ebiten.SetWindowTitle("Elygochi")
 	if icon, err := assets.LoadAppIcon(); err == nil {
 		ebiten.SetWindowIcon([]image.Image{icon})
 	}
@@ -203,12 +203,11 @@ func runMainWindow() {
 	g.store.save(g.state)
 }
 
-// scaleRect maps a rectangle from the shell art's native 1040x1112 space
-// into window coordinates, given the displayed shell size and offset.
+// scaleRect maps a rectangle from the shell art's native pixel space into
+// window coordinates, given the displayed shell size and offset.
 func scaleRect(r image.Rectangle, dispW, dispH, offX, offY int) image.Rectangle {
-	const nativeW, nativeH = 1040, 1112
-	sx := float64(dispW) / nativeW
-	sy := float64(dispH) / nativeH
+	sx := float64(dispW) / assets.ShellNativeW
+	sy := float64(dispH) / assets.ShellNativeH
 	return image.Rect(
 		offX+int(float64(r.Min.X)*sx),
 		offY+int(float64(r.Min.Y)*sy),
@@ -413,7 +412,7 @@ func (g *mainGame) scheduleAmbient() {
 }
 
 func (g *mainGame) Draw(screen *ebiten.Image) {
-	screen.Fill(color.RGBA{0xFF, 0xF3, 0xF7, 0xFF})
+	screen.Fill(bgColorForTime(time.Now()))
 	drawBackgroundDecor(screen)
 
 	var white ebiten.ColorScale

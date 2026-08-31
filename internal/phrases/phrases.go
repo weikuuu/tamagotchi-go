@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"math/rand"
 
-	"tamagotchi/internal/pet"
+	"elygochi/internal/pet"
 )
 
 // Category names a group of lines tied to one game situation.
