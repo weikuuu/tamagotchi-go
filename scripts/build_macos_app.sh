@@ -1,15 +1,15 @@
 #!/bin/sh
-# Builds "Elysia Tamagotchi.app", a normal double-clickable macOS app —
+# Builds "Elysia Tamagochi.app", a normal double-clickable macOS app —
 # no terminal needed to run it afterwards.
 #
 # Usage: ./scripts/build_macos_app.sh
-# Output: ./Elysia Tamagotchi.app (repo root)
+# Output: ./Elysia Tamagochi.app (repo root)
 
 set -e
 
 cd "$(dirname "$0")/.."
 
-APP="Elysia Tamagotchi.app"
+APP="Elysia Tamagochi.app"
 CONTENTS="$APP/Contents"
 MACOS="$CONTENTS/MacOS"
 RESOURCES="$CONTENTS/Resources"
@@ -37,9 +37,9 @@ cat > "$CONTENTS/Info.plist" <<'EOF'
 <plist version="1.0">
 <dict>
 	<key>CFBundleName</key>
-	<string>Elysia Tamagotchi</string>
+	<string>Elysia Tamagochi</string>
 	<key>CFBundleDisplayName</key>
-	<string>Elysia Tamagotchi</string>
+	<string>Elysia Tamagochi</string>
 	<key>CFBundleIdentifier</key>
 	<string>com.tamagotchi.elysia</string>
 	<key>CFBundleVersion</key>

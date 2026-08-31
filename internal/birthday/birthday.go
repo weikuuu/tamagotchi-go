@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -37,13 +38,30 @@ func Load() string {
 	return strings.TrimSpace(string(data))
 }
 
-var monthDayPattern = regexp.MustCompile(`^\d{2}-\d{2}$`)
+var monthDayPattern = regexp.MustCompile(`^(\d{2})-(\d{2})$`)
 
-// Save persists the given birthday, which must be "DD-MM".
+// daysInMonth is deliberately permissive about February (allows 29 even
+// though not every year is a leap year) since birthdays are stored without
+// a year at all.
+var daysInMonth = [13]int{0, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31}
+
+// Valid reports whether dayMonth is a real calendar date in "DD-MM" form
+// (e.g. rejects "67-67").
+func Valid(dayMonth string) bool {
+	m := monthDayPattern.FindStringSubmatch(strings.TrimSpace(dayMonth))
+	if m == nil {
+		return false
+	}
+	day, _ := strconv.Atoi(m[1])
+	month, _ := strconv.Atoi(m[2])
+	return month >= 1 && month <= 12 && day >= 1 && day <= daysInMonth[month]
+}
+
+// Save persists the given birthday, which must be "DD-MM" and a real date.
 func Save(dayMonth string) error {
 	dayMonth = strings.TrimSpace(dayMonth)
-	if !monthDayPattern.MatchString(dayMonth) {
-		return fmt.Errorf("birthday: %q is not in DD-MM format", dayMonth)
+	if !Valid(dayMonth) {
+		return fmt.Errorf("birthday: %q is not a valid DD-MM date", dayMonth)
 	}
 	p, err := path()
 	if err != nil {

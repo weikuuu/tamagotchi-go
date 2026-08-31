@@ -1,11 +1,12 @@
-// Package spotify reports the track currently playing on the user's
-// Spotify account (desktop app, web player, phone — whatever they're
-// listening on) via the official Web API, so Elysia can react to it.
+// Package spotify reports the track currently playing on Spotify, so
+// Elysia can react to it.
 //
-// It needs a one-time setup: a Spotify Developer "app" (just a Client ID,
-// no secret) with redirect URI http://127.0.0.1:8888/callback, saved as
-// plain text to the app's config dir as spotify_client_id.txt. See the
-// README. Without that file the service just stays idle.
+// The primary source is spotifylocal, which reads the local desktop app
+// directly — no setup, and it works on Free accounts. There's also an
+// optional Web API OAuth path (needs a one-time Spotify Developer "app"
+// Client ID, see README) used as a fallback when spotifylocal finds
+// nothing; note the Web API's player-state endpoints are Premium-only, so
+// that path is only useful to Premium users who specifically want it.
 package spotify
 
 import (
@@ -24,6 +25,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"tamagotchi/internal/spotifylocal"
 )
 
 const (
@@ -34,7 +37,8 @@ const (
 	nowPlayingURL = "https://api.spotify.com/v1/me/player/currently-playing"
 	scopes        = "user-read-currently-playing user-read-playback-state"
 
-	pollInterval = 5 * time.Second
+	pollInterval      = 5 * time.Second
+	localPollInterval = 2 * time.Second
 )
 
 // Snapshot is the latest known playback state.
@@ -56,19 +60,46 @@ type Service struct {
 	expiresAt   time.Time
 }
 
-// Start loads the config (client ID + any saved refresh token) and, if a
-// client ID is present, launches the background auth/poll loop. If no
-// client ID is configured, it returns a Service that's simply always
-// "not ready" — callers don't need to special-case that.
+// Start launches the background poll loop(s). It always polls the local
+// Spotify desktop app directly (spotifylocal) — no setup, and it works on
+// Free accounts, unlike the Web API's player-state endpoints which are
+// Premium-only. If a Client ID has also been configured (see SaveClientID),
+// it additionally runs the Web API OAuth flow as a secondary source, used
+// whenever the local read comes up empty (e.g. Spotify running on a
+// different device on the same network isn't visible locally, but might
+// still be reachable through the account's Web API state).
 func Start() *Service {
 	s := &Service{}
+	go s.runLocal()
+
 	clientID, err := loadClientID()
-	if err != nil || clientID == "" {
-		return s
+	if err == nil && clientID != "" {
+		s.clientID = clientID
+		go s.run()
 	}
-	s.clientID = clientID
-	go s.run()
 	return s
+}
+
+// runLocal polls the local Spotify desktop app. Whenever it gets a
+// definitive local read (Spotify is running on this machine), that's
+// authoritative — it overwrites whatever the Web API loop last reported,
+// since it's simpler, needs no auth, and reflects this machine's Spotify
+// specifically.
+func (s *Service) runLocal() {
+	poll := func() {
+		local := spotifylocal.Get()
+		if !local.OK {
+			return
+		}
+		s.mu.Lock()
+		s.snap = Snapshot{Track: local.Track, Artist: local.Artist, Playing: local.Playing, Ready: true}
+		s.mu.Unlock()
+	}
+	poll()
+	t := time.NewTicker(localPollInterval)
+	for range t.C {
+		poll()
+	}
 }
 
 // Snapshot returns the most recently polled playback state.
@@ -108,6 +139,11 @@ func (s *Service) run() {
 }
 
 func (s *Service) poll() {
+	// The local desktop-app read is authoritative when it's available;
+	// don't let a slightly-stale Web API response clobber it.
+	if spotifylocal.Get().OK {
+		return
+	}
 	req, _ := http.NewRequest(http.MethodGet, nowPlayingURL, nil)
 	req.Header.Set("Authorization", "Bearer "+s.accessTokenSnapshot())
 	resp, err := http.DefaultClient.Do(req)

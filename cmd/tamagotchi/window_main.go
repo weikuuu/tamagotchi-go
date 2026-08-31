@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"image"
 	"image/color"
@@ -56,9 +57,19 @@ const (
 
 	sleepAnimDuration = 15 * time.Second // played right after pressing "Спать"
 
+	easterEggDuration = 5 * time.Second // how long the "67-67" picture stays up
+
+	splashDuration = 2600 * time.Millisecond // the "Привет, {имя}" greeting on launch
+
 	idleThreshold     = 3 * time.Minute
 	longAbsenceMinGap = 6 * time.Hour
 )
+
+// errQuit is returned from Update to end the game loop once the user has
+// confirmed the close-window warning; ebiten.RunGame treats any non-nil
+// error as fatal, so it's checked for and swallowed at the call site
+// instead of being logged like a real failure.
+var errQuit = errors.New("closed by user")
 
 // shellHeight is derived from the source art's aspect ratio (1040x1112).
 var shellHeight = func() int {
@@ -79,11 +90,12 @@ type mainGame struct {
 	state    pet.State
 	lastSave time.Time
 
-	portraits map[pet.Mood]assets.PortraitSet
-	frame     *ebiten.Image
-	bubbleImg *ebiten.Image
-	screenBox image.Rectangle // scaled screen cutout, in window coordinates
-	buttons   []button
+	portraits    map[pet.Mood]assets.PortraitSet
+	frame        *ebiten.Image
+	bubbleImg    *ebiten.Image
+	easterEggImg *ebiten.Image
+	screenBox    image.Rectangle // scaled screen cutout, in window coordinates
+	buttons      []button
 
 	weather *weather.Service
 	sysinfo *sysinfo.Service
@@ -103,6 +115,11 @@ type mainGame struct {
 	lastInteraction time.Time
 
 	sleepUntil time.Time // active right after pressing "Спать"
+
+	easterEggUntil time.Time // active after typing "67-67" into the birthday field
+
+	splashStart  time.Time // set once at startup; drives the "Привет, {имя}" intro animation
+	closeConfirm bool      // true while the "are you sure you want to leave" prompt is up
 
 	birthdayMonthDay string // "DD-MM", loaded once at startup; "" if unset
 	username         string // loaded once at startup; "" if unset
@@ -127,6 +144,10 @@ func runMainWindow() {
 	if err != nil {
 		log.Fatalf("main window: failed to load bubble: %v", err)
 	}
+	easterEggImg, err := assets.LoadEasterEgg()
+	if err != nil {
+		log.Fatalf("main window: failed to load easter egg: %v", err)
+	}
 
 	store, state := openSharedState()
 	now := time.Now()
@@ -136,6 +157,8 @@ func runMainWindow() {
 		portraits:        portraits,
 		frame:            frame,
 		bubbleImg:        bubbleImg,
+		easterEggImg:     easterEggImg,
+		splashStart:      now,
 		lastInteraction:  now,
 		weather:          weather.Start(),
 		sysinfo:          sysinfo.Start(),
@@ -165,12 +188,16 @@ func runMainWindow() {
 	}
 
 	ebiten.SetWindowSize(winWidth, winHeight)
-	ebiten.SetWindowTitle("Elysia — tamagotchi")
+	ebiten.SetWindowTitle("Elysia — tamagochi")
+	if icon, err := assets.LoadAppIcon(); err == nil {
+		ebiten.SetWindowIcon([]image.Image{icon})
+	}
 	ebiten.SetWindowResizable(true)
 	ebiten.SetWindowSizeLimits(winWidth/2, winHeight/2, -1, -1)
 	ebiten.SetTPS(30) // no need for 60fps on a mostly-static stats window; halves CPU/GPU load
+	ebiten.SetWindowClosingHandled(true)
 
-	if err := ebiten.RunGame(g); err != nil {
+	if err := ebiten.RunGame(g); err != nil && err != errQuit {
 		log.Printf("main window: %v", err)
 	}
 	g.store.save(g.state)
@@ -194,8 +221,42 @@ func (g *mainGame) Update() error {
 	now := time.Now()
 	g.state.Tick(now)
 
+	if ebiten.IsWindowBeingClosed() {
+		g.closeConfirm = true
+	}
+	if g.closeConfirm {
+		if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
+			mx, my := ebiten.CursorPosition()
+			p := image.Pt(mx, my)
+			switch {
+			case p.In(closeConfirmStayRect()):
+				g.closeConfirm = false
+			case p.In(closeConfirmLeaveRect()):
+				return errQuit
+			}
+		}
+		if inpututil.IsKeyJustPressed(ebiten.KeyEscape) {
+			g.closeConfirm = false
+		}
+		return nil
+	}
+
+	if time.Since(g.splashStart) < splashDuration {
+		if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) || inpututil.IsKeyJustPressed(ebiten.KeyEscape) {
+			g.splashStart = g.splashStart.Add(-splashDuration)
+		}
+		return nil
+	}
+
 	if g.editField != "" {
 		g.updateTextInput()
+		return nil
+	}
+
+	if now.Before(g.easterEggUntil) {
+		if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) || inpututil.IsKeyJustPressed(ebiten.KeyEscape) {
+			g.easterEggUntil = time.Time{}
+		}
 		return nil
 	}
 
@@ -319,7 +380,9 @@ func (g *mainGame) updateTextInput() {
 				g.username = g.inputBuffer
 				_ = username.Save(g.username)
 			case "birthday":
-				if err := birthday.Save(g.inputBuffer); err == nil {
+				if g.inputBuffer == "67-67" {
+					g.easterEggUntil = time.Now().Add(easterEggDuration)
+				} else if err := birthday.Save(g.inputBuffer); err == nil {
 					g.birthdayMonthDay = g.inputBuffer
 				}
 			case "spotify":
@@ -453,6 +516,141 @@ func (g *mainGame) Draw(screen *ebiten.Image) {
 	if g.miniGame != nil {
 		g.drawMiniGame(screen)
 	}
+
+	if time.Now().Before(g.easterEggUntil) {
+		g.drawEasterEgg(screen)
+	}
+
+	if time.Since(g.splashStart) < splashDuration {
+		g.drawSplash(screen)
+	}
+
+	if g.closeConfirm {
+		g.drawCloseConfirm(screen)
+	}
+}
+
+// drawSplash shows a big "Привет, {имя}!" greeting for a few seconds right
+// after launch: fades and drops in, holds, then fades back out.
+func (g *mainGame) drawSplash(screen *ebiten.Image) {
+	t := time.Since(g.splashStart).Seconds()
+	total := splashDuration.Seconds()
+	frac := t / total
+
+	var alpha float64
+	var yOff float64
+	switch {
+	case frac < 0.18:
+		p := frac / 0.18
+		alpha = p
+		yOff = (1 - p) * -34
+	case frac < 0.75:
+		alpha = 1
+	default:
+		p := (frac - 0.75) / 0.25
+		alpha = 1 - p
+	}
+	if alpha <= 0 {
+		return
+	}
+
+	vector.DrawFilledRect(screen, 0, 0, winWidth, winHeight, color.RGBA{0xFF, 0xF3, 0xF7, uint8(alpha * 255)}, false)
+
+	greeting := "Привет!"
+	if g.username != "" {
+		greeting = "Привет, " + g.username + "!"
+	}
+
+	cx, cy := winWidth/2.0, winHeight/2.0+yOff
+
+	outline := color.RGBA{0xD6, 0x14, 0x7A, 0xFF}
+	var outlineCS ebiten.ColorScale
+	outlineCS.ScaleWithColor(outline)
+	outlineCS.ScaleAlpha(float32(alpha))
+	const r = 2.2
+	for _, o := range [][2]float64{{-r, 0}, {r, 0}, {0, -r}, {0, r}, {-r, -r}, {r, -r}, {-r, r}, {r, r}} {
+		uifont.DrawCentered(screen, greeting, 30, cx+o[0], cy+o[1], outlineCS)
+	}
+
+	var whiteCS ebiten.ColorScale
+	whiteCS.ScaleWithColor(color.White)
+	whiteCS.ScaleAlpha(float32(alpha))
+	uifont.DrawCentered(screen, greeting, 30, cx, cy, whiteCS)
+}
+
+func closeConfirmCardRect() image.Rectangle {
+	const w, h = 380, 220
+	x := (winWidth - w) / 2
+	y := (winHeight - h) / 2
+	return image.Rect(x, y, x+w, y+h)
+}
+
+func closeConfirmStayRect() image.Rectangle {
+	card := closeConfirmCardRect()
+	w, h := 150, 44
+	x := card.Min.X + 30
+	y := card.Max.Y - 60
+	return image.Rect(x, y, x+w, y+h)
+}
+
+func closeConfirmLeaveRect() image.Rectangle {
+	card := closeConfirmCardRect()
+	w, h := 150, 44
+	x := card.Max.X - 30 - w
+	y := card.Max.Y - 60
+	return image.Rect(x, y, x+w, y+h)
+}
+
+// drawCloseConfirm shows a little "please don't go" prompt when the user
+// clicks the window's close button, instead of just quitting immediately.
+func (g *mainGame) drawCloseConfirm(screen *ebiten.Image) {
+	vector.DrawFilledRect(screen, 0, 0, winWidth, winHeight, color.RGBA{0x24, 0x1B, 0x2E, 0xB0}, false)
+
+	card := closeConfirmCardRect()
+	vector.DrawFilledRect(screen, float32(card.Min.X), float32(card.Min.Y), float32(card.Dx()), float32(card.Dy()), color.RGBA{0xFF, 0xF3, 0xF7, 0xFF}, true)
+	vector.StrokeRect(screen, float32(card.Min.X), float32(card.Min.Y), float32(card.Dx()), float32(card.Dy()), 2, color.RGBA{0xD6, 0x14, 0x7A, 0xC0}, true)
+
+	ink := inkColor()
+	uifont.DrawCentered(screen, "Ты уже уходишь?", 17, float64(card.Min.X+card.Dx()/2), float64(card.Min.Y+24), ink)
+	uifont.DrawCentered(screen, "Мне будет одиноко без тебя...", 13, float64(card.Min.X+card.Dx()/2), float64(card.Min.Y+58), bubbleInkColor())
+
+	mx, my := ebiten.CursorPosition()
+	hover := image.Pt(mx, my)
+
+	stayR := closeConfirmStayRect()
+	stayBg := color.RGBA{0x8A, 0xD0, 0xC8, 0xFF}
+	if hover.In(stayR) {
+		stayBg = lighten(stayBg)
+	}
+	vector.DrawFilledRect(screen, float32(stayR.Min.X), float32(stayR.Min.Y), float32(stayR.Dx()), float32(stayR.Dy()), stayBg, true)
+	var white ebiten.ColorScale
+	uifont.DrawCentered(screen, "Остаться", 14, float64(stayR.Min.X+stayR.Dx()/2), float64(stayR.Min.Y+13), white)
+
+	leaveR := closeConfirmLeaveRect()
+	leaveBg := color.RGBA{0xB0, 0xB0, 0xB0, 0xFF}
+	if hover.In(leaveR) {
+		leaveBg = lighten(leaveBg)
+	}
+	vector.DrawFilledRect(screen, float32(leaveR.Min.X), float32(leaveR.Min.Y), float32(leaveR.Dx()), float32(leaveR.Dy()), leaveBg, true)
+	uifont.DrawCentered(screen, "Закрыть", 14, float64(leaveR.Min.X+leaveR.Dx()/2), float64(leaveR.Min.Y+13), white)
+}
+
+// drawEasterEgg shows the hidden "67-67" birthday-field picture, centered
+// over a dark backdrop, dismissed by clicking or Escape (or just waiting
+// it out).
+func (g *mainGame) drawEasterEgg(screen *ebiten.Image) {
+	vector.DrawFilledRect(screen, 0, 0, winWidth, winHeight, color.RGBA{0x24, 0x1B, 0x2E, 0xD0}, false)
+
+	b := g.easterEggImg.Bounds()
+	const maxW, maxH = 360.0, 480.0
+	scale := math.Min(maxW/float64(b.Dx()), maxH/float64(b.Dy()))
+	dw, dh := float64(b.Dx())*scale, float64(b.Dy())*scale
+
+	opts := &ebiten.DrawImageOptions{}
+	opts.Filter = ebiten.FilterLinear
+	opts.GeoM.Scale(scale, scale)
+	opts.GeoM.Translate((winWidth-dw)/2, (winHeight-dh)/2)
+	screen.DrawImage(g.easterEggImg, opts)
 }
 
 // drawBubble shows the current line in the same cute speech-bubble art the

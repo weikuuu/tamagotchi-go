@@ -11,6 +11,7 @@ import (
 	"embed"
 	"fmt"
 	"image"
+	_ "image/jpeg"
 	_ "image/png"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -27,6 +28,12 @@ var stickersFS embed.FS
 
 //go:embed frame
 var frameFS embed.FS
+
+//go:embed appicon.png
+var appIconFS embed.FS
+
+//go:embed easter_egg.jpg
+var easterEggFS embed.FS
 
 // Frame layout, in the coordinate space of the shell.png asset itself
 // (1040x1112). ScreenRect is the pixel rectangle of the shell's screen
@@ -221,6 +228,25 @@ func LoadSleepSticker() (*gifanim.Animation, error) {
 		return nil, fmt.Errorf("assets: sleep sticker: %w", err)
 	}
 	return gifanim.Decode(data)
+}
+
+// LoadAppIcon decodes the app icon as a plain image.Image, for
+// ebiten.SetWindowIcon (which sets the taskbar/title-bar icon on Windows
+// and Linux — GLFW only picks up an exe's embedded icon resource if it's
+// named exactly "GLFW_ICON", which our build tooling doesn't guarantee, so
+// setting it explicitly at runtime is the reliable path).
+func LoadAppIcon() (image.Image, error) {
+	data, err := appIconFS.ReadFile("appicon.png")
+	if err != nil {
+		return nil, err
+	}
+	img, _, err := image.Decode(bytes.NewReader(data))
+	return img, err
+}
+
+// LoadEasterEgg decodes the birthday-field "67-67" easter egg image.
+func LoadEasterEgg() (*ebiten.Image, error) {
+	return decodePNG(easterEggFS, "easter_egg.jpg")
 }
 
 func decodePNG(fsys embed.FS, path string) (*ebiten.Image, error) {
