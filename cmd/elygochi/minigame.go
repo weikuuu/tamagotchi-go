@@ -197,6 +197,12 @@ func (g *mainGame) drawMiniGame(screen *ebiten.Image) {
 	if mg.finished {
 		uifont.DrawCentered(screen, "Результат", 18, float64(area.Min.X+area.Dx()/2), float64(area.Min.Y+40), ink)
 		uifont.DrawCentered(screen, fmt.Sprintf("Поймано сердечек: %d", mg.score), 16, float64(area.Min.X+area.Dx()/2), float64(area.Min.Y+80), bubbleInkColor())
+
+		midCX, midCY := float32(area.Min.X+area.Dx()/2), float32(area.Min.Y+area.Dy()/2+20)
+		drawHeart(screen, midCX-90, midCY, 10, color.RGBA{0xF2, 0x9C, 0xC3, 0xE0})
+		drawSparkle(screen, midCX+95, midCY-14, 9, color.RGBA{0xE8, 0x4A, 0x8A, 0xE0})
+		uifont.DrawCentered(screen, "Ты молодец!", 17, float64(midCX), float64(midCY-10), bubbleInkColor())
+
 		uifont.DrawCentered(screen, "Клик, чтобы закрыть", 12, float64(area.Min.X+area.Dx()/2), float64(area.Min.Y+area.Dy()-30), ink)
 		return
 	}

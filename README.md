@@ -48,7 +48,14 @@ playing directly from it — no login, no developer account, and critically
 are Premium-only; reading the local app directly isn't). This just works
 out of the box the moment you open Spotify.
 
-- macOS: via AppleScript talking to the local `Spotify.app`.
+- macOS: via AppleScript talking to the local `Spotify.app`. The first time,
+  macOS may show a one-time **"Elygochi wants to control Spotify"** prompt
+  (System Settings → Privacy & Security → Automation) — this has to be
+  allowed for local detection to work. If it doesn't seem to be picking
+  anything up and you don't remember seeing that prompt, check that section
+  of System Settings directly; if Elygochi is listed there but *unchecked*
+  for Spotify, that's it — turn it on. If it's not listed at all yet, quit
+  and reopen the app to trigger the prompt again.
 - Windows: by reading the track/artist straight out of the Spotify window's
   title bar (a long-standing, stable behavior of the Windows client).
 

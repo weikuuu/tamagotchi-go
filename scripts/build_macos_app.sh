@@ -18,7 +18,7 @@ rm -rf "$APP"
 mkdir -p "$MACOS" "$RESOURCES"
 
 echo "Building binary..."
-go build -o "$MACOS/elygochi" ./cmd/elygochi
+go build -o "$MACOS/Elygochi" ./cmd/elygochi
 
 echo "Building app icon..."
 ICONSET=$(mktemp -d)/AppIcon.iconset
@@ -49,7 +49,7 @@ cat > "$CONTENTS/Info.plist" <<'EOF'
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleExecutable</key>
-	<string>elygochi</string>
+	<string>Elygochi</string>
 	<key>CFBundleIconFile</key>
 	<string>AppIcon</string>
 	<key>NSHighResolutionCapable</key>
