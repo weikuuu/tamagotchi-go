@@ -581,19 +581,23 @@ func closeConfirmCardRect() image.Rectangle {
 	return image.Rect(x, y, x+w, y+h)
 }
 
+// closeConfirmStayRect is the single prominent button, dead-centered on the
+// card — staying is the expected/safe action, so it gets the emphasis.
 func closeConfirmStayRect() image.Rectangle {
 	card := closeConfirmCardRect()
-	w, h := 150, 44
-	x := card.Min.X + 30
-	y := card.Max.Y - 60
+	w, h := 200, 46
+	x := card.Min.X + (card.Dx()-w)/2
+	y := card.Max.Y - 96
 	return image.Rect(x, y, x+w, y+h)
 }
 
+// closeConfirmLeaveRect is a smaller, plain-text link below the main
+// button, also centered — the "I actually want to quit" escape hatch.
 func closeConfirmLeaveRect() image.Rectangle {
 	card := closeConfirmCardRect()
-	w, h := 150, 44
-	x := card.Max.X - 30 - w
-	y := card.Max.Y - 60
+	w, h := 160, 28
+	x := card.Min.X + (card.Dx()-w)/2
+	y := card.Max.Y - 40
 	return image.Rect(x, y, x+w, y+h)
 }
 
@@ -620,15 +624,14 @@ func (g *mainGame) drawCloseConfirm(screen *ebiten.Image) {
 	}
 	vector.DrawFilledRect(screen, float32(stayR.Min.X), float32(stayR.Min.Y), float32(stayR.Dx()), float32(stayR.Dy()), stayBg, true)
 	var white ebiten.ColorScale
-	uifont.DrawCentered(screen, "Остаться", 14, float64(stayR.Min.X+stayR.Dx()/2), float64(stayR.Min.Y+13), white)
+	uifont.DrawCentered(screen, "Остаться", 15, float64(stayR.Min.X+stayR.Dx()/2), float64(stayR.Min.Y+14), white)
 
 	leaveR := closeConfirmLeaveRect()
-	leaveBg := color.RGBA{0xB0, 0xB0, 0xB0, 0xFF}
+	leaveInk := inkColor()
 	if hover.In(leaveR) {
-		leaveBg = lighten(leaveBg)
+		leaveInk = bubbleInkColor()
 	}
-	vector.DrawFilledRect(screen, float32(leaveR.Min.X), float32(leaveR.Min.Y), float32(leaveR.Dx()), float32(leaveR.Dy()), leaveBg, true)
-	uifont.DrawCentered(screen, "Закрыть", 14, float64(leaveR.Min.X+leaveR.Dx()/2), float64(leaveR.Min.Y+13), white)
+	uifont.DrawCentered(screen, "Всё равно закрыть", 12, float64(leaveR.Min.X+leaveR.Dx()/2), float64(leaveR.Min.Y+7), leaveInk)
 }
 
 // drawEasterEgg shows the hidden "67-67" birthday-field picture, centered
@@ -680,15 +683,15 @@ func (g *mainGame) drawBubble(screen *ebiten.Image) {
 
 	ink := bubbleInkColor()
 	if g.bubbleWrapSrc != g.message {
-		g.bubbleWrapLines = uifont.Wrap(g.message, 14, textW)
+		g.bubbleWrapLines = uifont.Wrap(g.message, 12, textW)
 		g.bubbleWrapSrc = g.message
 	}
 	lines := g.bubbleWrapLines
-	lineH := 17.0
+	lineH := 15.0
 	totalH := float64(len(lines)) * lineH
 	textCY := by + float64(tr.Min.Y+tr.Max.Y)/2*scale - totalH/2
 	for i, line := range lines {
-		uifont.DrawCentered(screen, line, 14, textX+textW/2, textCY+float64(i)*lineH, ink)
+		uifont.DrawCentered(screen, line, 12, textX+textW/2, textCY+float64(i)*lineH, ink)
 	}
 }
 
