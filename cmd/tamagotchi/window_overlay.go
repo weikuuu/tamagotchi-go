@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"math"
 	"math/rand"
@@ -105,6 +106,9 @@ type overlayGame struct {
 	nextAmbient     time.Time
 	lastInteraction time.Time
 
+	bubbleWrapSrc   string // "text|width" the cache below was computed from
+	bubbleWrapLines []string
+
 	canvasW, canvasH int
 	extraTop         int // extra canvas height added above the sprite for the bubble
 
@@ -140,6 +144,7 @@ func runOverlay() {
 	ebiten.SetWindowResizable(false)
 	ebiten.SetWindowTitle("Elysia")
 	ebiten.SetScreenClearedEveryFrame(true)
+	ebiten.SetTPS(30) // a desktop pet doesn't need 60fps; halves CPU/GPU load
 
 	mw, mh := ebiten.Monitor().Size()
 	if mw == 0 || mh == 0 {
@@ -576,7 +581,12 @@ func (g *overlayGame) drawBubble(screen *ebiten.Image) {
 
 	ink := bubbleInkColor()
 
-	lines := uifont.Wrap(g.bubbleText, g.bubbleFont, textW)
+	wrapKey := fmt.Sprintf("%s|%.1f", g.bubbleText, textW)
+	if g.bubbleWrapSrc != wrapKey {
+		g.bubbleWrapLines = uifont.Wrap(g.bubbleText, g.bubbleFont, textW)
+		g.bubbleWrapSrc = wrapKey
+	}
+	lines := g.bubbleWrapLines
 	lineH := g.bubbleFont + 3
 	totalH := float64(len(lines)) * lineH
 	textCY := by + float64(tr.Min.Y+tr.Max.Y)/2*scaleY - totalH/2

@@ -26,10 +26,11 @@ import (
 
 const (
 	winWidth  = 560
-	winHeight = 842
+	winHeight = 848
 
-	infoBarHeight = 26 // top strip showing clock/weather/activity; click to edit the city
-	nameZoneWidth = 96 // right-hand slice of the info bar; click to edit your name
+	infoBarHeight     = 26 // top strip showing clock/weather/activity; click to edit the city
+	nameZoneWidth     = 96 // right-hand slice of the info bar; click to edit your name
+	settingsZoneWidth = 84 // left-hand slice of the info bar; click to open settings
 
 	nowPlayingY      = infoBarHeight + 4
 	nowPlayingHeight = 24 // dedicated row for "what's playing", separate from the crowded info bar
@@ -42,9 +43,9 @@ const (
 	barHeight = 18
 	barGap    = 34
 
-	buttonWidth  = 104
+	buttonWidth  = 92
 	buttonHeight = 48
-	buttonGap    = 12
+	buttonGap    = 8
 
 	messageDuration    = 4 * time.Second
 	ambientMinInterval = 12 * time.Second
@@ -54,8 +55,6 @@ const (
 
 	idleThreshold     = 3 * time.Minute
 	longAbsenceMinGap = 6 * time.Hour
-
-	settingsButtonAreaHeight = 56 // bottom margin below the buttons, holds the "Настройки" link
 )
 
 // shellHeight is derived from the source art's aspect ratio (1040x1112).
@@ -90,6 +89,7 @@ type mainGame struct {
 	editField    string // "" | "city" | "username" | "birthday" | "spotify" — which text field is being edited
 	inputBuffer  string
 	showSettings bool
+	miniGame     *miniGameState // non-nil while the "catch the hearts" mini-game is open
 
 	lastTrackKey string // "track|artist" last seen, to detect changes
 
@@ -103,6 +103,12 @@ type mainGame struct {
 
 	birthdayMonthDay string // "MM-DD", loaded once at startup; "" if unset
 	username         string // loaded once at startup; "" if unset
+
+	bubbleWrapSrc   string   // g.message this cache was computed from
+	bubbleWrapLines []string // memoized uifont.Wrap(g.message, ...) — word-wrap does font shaping, too slow to redo every frame
+
+	nowPlayingSrc string // "track|artist" the cached line below was built from
+	nowPlayingTxt string
 }
 
 func runMainWindow() {
@@ -144,9 +150,10 @@ func runMainWindow() {
 		{label: "Играть", actionKey: "play", action: (*pet.State).Play, color: color.RGBA{0x8A, 0xB4, 0xE8, 0xFF}},
 		{label: "Спать", actionKey: "rest", action: (*pet.State).Rest, color: color.RGBA{0xA0, 0x8A, 0xE8, 0xFF}},
 		{label: "Искупать", actionKey: "wash", action: (*pet.State).Wash, color: color.RGBA{0x8A, 0xD0, 0xC8, 0xFF}},
+		{label: "Мини-игра", actionKey: "minigame", action: func(*pet.State) {}, color: color.RGBA{0xE8, 0x4A, 0x8A, 0xFF}},
 	}
 	g.scheduleAmbient()
-	buttonY := winHeight - buttonHeight - settingsButtonAreaHeight
+	buttonY := winHeight - buttonHeight - 28
 	totalW := len(g.buttons)*buttonWidth + (len(g.buttons)-1)*buttonGap
 	x := (winWidth - totalW) / 2
 	for i := range g.buttons {
@@ -157,6 +164,7 @@ func runMainWindow() {
 	ebiten.SetWindowSize(winWidth, winHeight)
 	ebiten.SetWindowTitle("Elysia — tamagotchi")
 	ebiten.SetWindowResizable(false)
+	ebiten.SetTPS(30) // no need for 60fps on a mostly-static stats window; halves CPU/GPU load
 
 	if err := ebiten.RunGame(g); err != nil {
 		log.Printf("main window: %v", err)
@@ -192,41 +200,49 @@ func (g *mainGame) Update() error {
 		return nil
 	}
 
+	if g.miniGame != nil {
+		g.updateMiniGame()
+		return nil
+	}
+
 	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
 		mx, my := ebiten.CursorPosition()
 		p := image.Pt(mx, my)
 
 		if my < infoBarHeight {
-			if mx >= winWidth-nameZoneWidth {
+			switch {
+			case mx < settingsZoneWidth:
+				g.showSettings = true
+			case mx >= winWidth-nameZoneWidth:
 				g.editField = "username"
 				g.inputBuffer = g.username
-			} else {
+			default:
 				g.editField = "city"
 				g.inputBuffer = g.weather.City()
 			}
 			return nil
 		}
 
-		if p.In(settingsButtonRect()) {
-			g.showSettings = true
-			return nil
-		}
-
 		for _, b := range g.buttons {
-			if p.In(b.rect) {
-				b.action(&g.state)
-				g.lastInteraction = now
-				if streakUp := g.state.RecordActivity(now); streakUp {
-					g.say(phrases.Get(phrases.Streak))
-				} else {
-					g.say(phrases.ForAction(b.actionKey, g.state))
-				}
-				if b.actionKey == "rest" {
-					g.sleepUntil = now.Add(sleepAnimDuration)
-				}
-				g.store.save(g.state)
+			if !p.In(b.rect) {
+				continue
+			}
+			if b.actionKey == "minigame" {
+				g.startMiniGame()
 				break
 			}
+			b.action(&g.state)
+			g.lastInteraction = now
+			if streakUp := g.state.RecordActivity(now); streakUp {
+				g.say(phrases.Get(phrases.Streak))
+			} else {
+				g.say(phrases.ForAction(b.actionKey, g.state))
+			}
+			if b.actionKey == "rest" {
+				g.sleepUntil = now.Add(sleepAnimDuration)
+			}
+			g.store.save(g.state)
+			break
 		}
 	}
 
@@ -325,6 +341,7 @@ func (g *mainGame) Draw(screen *ebiten.Image) {
 			nameLabel = g.username
 		}
 		uifont.DrawCentered(screen, nameLabel, 12, float64(winWidth-nameZoneWidth/2), 10, ink)
+		uifont.DrawCentered(screen, "Настр.", 10, float64(settingsZoneWidth/2), 9, ink)
 	}
 
 	g.drawNowPlaying(screen)
@@ -383,10 +400,11 @@ func (g *mainGame) Draw(screen *ebiten.Image) {
 	drawBar(screen, "Энергия", float64(g.state.Energy)/float64(pet.MaxStat), barsTop+barGap, color.RGBA{0x8A, 0xB4, 0xE8, 0xFF})
 	drawBar(screen, "Радость", float64(g.state.Happiness)/float64(pet.MaxStat), barsTop+2*barGap, color.RGBA{0xE8, 0xD8, 0x8A, 0xFF})
 	drawBar(screen, "Чистота", float64(g.state.Cleanliness)/float64(pet.MaxStat), barsTop+3*barGap, color.RGBA{0x8A, 0xD0, 0xC8, 0xFF})
+	drawBar(screen, "Привязанность", float64(g.state.Affection)/float64(pet.MaxStat), barsTop+4*barGap, color.RGBA{0xE8, 0x4A, 0x8A, 0xFF})
 
-	uifont.DrawCentered(screen, moodLabel(mood), 16, winWidth/2, float64(barsTop+4*barGap+2), ink)
+	uifont.DrawCentered(screen, moodLabel(mood), 16, winWidth/2, float64(barsTop+5*barGap+2), ink)
 	if g.state.StreakDays > 0 {
-		uifont.DrawCentered(screen, streakLabel(g.state.StreakDays), 13, winWidth/2, float64(barsTop+4*barGap+26), ink)
+		uifont.DrawCentered(screen, streakLabel(g.state.StreakDays), 13, winWidth/2, float64(barsTop+5*barGap+26), ink)
 	}
 
 	mx, my := ebiten.CursorPosition()
@@ -397,11 +415,8 @@ func (g *mainGame) Draw(screen *ebiten.Image) {
 			c = lighten(c)
 		}
 		vector.DrawFilledRect(screen, float32(b.rect.Min.X), float32(b.rect.Min.Y), float32(b.rect.Dx()), float32(b.rect.Dy()), c, true)
-		uifont.DrawCentered(screen, b.label, 16, float64(b.rect.Min.X+b.rect.Dx()/2), float64(b.rect.Min.Y+b.rect.Dy()/2-11), white)
+		uifont.DrawCentered(screen, b.label, 13, float64(b.rect.Min.X+b.rect.Dx()/2), float64(b.rect.Min.Y+b.rect.Dy()/2-9), white)
 	}
-
-	sr := settingsButtonRect()
-	uifont.DrawCentered(screen, "⚙ Настройки", 13, float64(sr.Min.X+sr.Dx()/2), float64(sr.Min.Y+4), ink)
 
 	if time.Now().Before(g.messageUntil) {
 		g.drawBubble(screen)
@@ -410,14 +425,10 @@ func (g *mainGame) Draw(screen *ebiten.Image) {
 	if g.showSettings {
 		g.drawSettings(screen)
 	}
-}
 
-// settingsButtonRect is the clickable "⚙ Настройки" link in the bottom
-// margin below the action buttons.
-func settingsButtonRect() image.Rectangle {
-	w, h := 120, 24
-	y := winHeight - settingsButtonAreaHeight/2 - h/2
-	return image.Rect(winWidth/2-w/2, y, winWidth/2+w/2, y+h)
+	if g.miniGame != nil {
+		g.drawMiniGame(screen)
+	}
 }
 
 // drawBubble shows the current line in the same cute speech-bubble art the
@@ -450,7 +461,11 @@ func (g *mainGame) drawBubble(screen *ebiten.Image) {
 	textW := float64(tr.Dx()) * scale
 
 	ink := bubbleInkColor()
-	lines := uifont.Wrap(g.message, 14, textW)
+	if g.bubbleWrapSrc != g.message {
+		g.bubbleWrapLines = uifont.Wrap(g.message, 14, textW)
+		g.bubbleWrapSrc = g.message
+	}
+	lines := g.bubbleWrapLines
 	lineH := 17.0
 	totalH := float64(len(lines)) * lineH
 	textCY := by + float64(tr.Min.Y+tr.Max.Y)/2*scale - totalH/2
@@ -543,13 +558,41 @@ func (g *mainGame) drawNowPlaying(screen *ebiten.Image) {
 	vector.DrawFilledRect(screen, x, nowPlayingY, w, nowPlayingHeight, color.RGBA{0xE3, 0xA8, 0xD8, 0x80}, true)
 	vector.StrokeRect(screen, x, nowPlayingY, w, nowPlayingHeight, 1, color.RGBA{0xD6, 0x14, 0x7A, 0x90}, true)
 
-	text := fmt.Sprintf("♪ %s — %s", snap.Track, snap.Artist)
-	maxW := float64(w) - 16
-	for tw, _ := uifont.Measure(text, 13); tw > maxW && len([]rune(text)) > 4; tw, _ = uifont.Measure(text, 13) {
-		r := []rune(text)
-		text = string(r[:len(r)-2]) + "…"
+	if snap.Playing {
+		drawEqualizer(screen, x+10, float32(nowPlayingY)+4, nowPlayingHeight-8)
 	}
-	uifont.DrawCentered(screen, text, 13, winWidth/2, nowPlayingY+5, inkColor())
+
+	key := snap.Track + "|" + snap.Artist
+	if g.nowPlayingSrc != key {
+		text := fmt.Sprintf("Играет: %s — %s", snap.Track, snap.Artist)
+		maxW := float64(w) - 50
+		for tw, _ := uifont.Measure(text, 13); tw > maxW && len([]rune(text)) > 4; tw, _ = uifont.Measure(text, 13) {
+			r := []rune(text)
+			text = string(r[:len(r)-2]) + "..."
+		}
+		g.nowPlayingTxt = text
+		g.nowPlayingSrc = key
+	}
+	uifont.DrawCentered(screen, g.nowPlayingTxt, 13, winWidth/2, nowPlayingY+5, inkColor())
+}
+
+// drawEqualizer draws a tiny row of pulsing bars, purely decorative (not
+// driven by real audio data — Spotify's API doesn't expose that), just to
+// give the "now playing" pill some life while a track is active.
+func drawEqualizer(screen *ebiten.Image, x, y, h float32) {
+	const bars = 4
+	const barW float32 = 3
+	const gap float32 = 2
+	now := float64(time.Now().UnixMilli()) / 1000
+	for i := 0; i < bars; i++ {
+		phase := float64(i) * 1.7
+		freq := 3.0 + float64(i)*0.7
+		amp := (math.Sin(now*freq+phase) + 1) / 2 // 0..1
+		barH := float32(3) + float32(amp)*(h-3)
+		bx := x + float32(i)*(barW+gap)
+		by := y + h - barH
+		vector.DrawFilledRect(screen, bx, by, barW, barH, color.RGBA{0xD6, 0x14, 0x7A, 0xC0}, true)
+	}
 }
 
 func moodLabel(m pet.Mood) string {

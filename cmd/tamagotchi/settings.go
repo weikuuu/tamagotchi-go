@@ -201,7 +201,7 @@ func (g *mainGame) drawSettings(screen *ebiten.Image) {
 	uifont.DrawCentered(screen, "Закрыть", 14, float64(closeR.Min.X+closeR.Dx()/2), float64(closeR.Min.Y+10), white)
 }
 
-// drawScaleRow renders the "−  120%  +" stepper that resizes the desktop
+// drawScaleRow renders the "-  120%  +" stepper that resizes the desktop
 // overlay (a separate process — it picks the new size up within a second
 // via overlaycfg).
 func (g *mainGame) drawScaleRow(screen *ebiten.Image, card image.Rectangle, hover image.Point) {
@@ -222,7 +222,7 @@ func (g *mainGame) drawScaleRow(screen *ebiten.Image, card image.Rectangle, hove
 		var white ebiten.ColorScale
 		uifont.DrawCentered(screen, label, 14, float64(br.Min.X+br.Dx()/2), float64(br.Min.Y+4), white)
 	}
-	drawStepperBtn(settingsScaleMinusRect(r), "−")
+	drawStepperBtn(settingsScaleMinusRect(r), "-")
 	drawStepperBtn(settingsScalePlusRect(r), "+")
 
 	pct := fmt.Sprintf("%.0f%%", scale*100)

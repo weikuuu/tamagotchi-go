@@ -69,6 +69,7 @@ type State struct {
 	Energy      Stat      `json:"energy"`      // 0 = exhausted, 100 = rested
 	Happiness   Stat      `json:"happiness"`   // 0 = miserable, 100 = joyful
 	Cleanliness Stat      `json:"cleanliness"` // 0 = filthy, 100 = spotless
+	Affection   Stat      `json:"affection"`   // 0 = stranger, 100 = inseparable; never decays, only grows
 	LastTick    time.Time `json:"last_tick"`
 
 	// LastActiveDate (YYYY-MM-DD, local) and StreakDays track consecutive
@@ -85,6 +86,7 @@ func NewState(now time.Time) State {
 		Energy:      MaxStat,
 		Happiness:   MaxStat,
 		Cleanliness: MaxStat,
+		Affection:   25,
 		LastTick:    now,
 	}
 }
@@ -122,33 +124,56 @@ const (
 	restEnergyGain      = 40
 	petHappinessGain    = 8
 	washCleanlinessGain = 50
+
+	feedAffectionGain = 1.5
+	playAffectionGain = 2
+	restAffectionGain = 1
+	petAffectionGain  = 1
+	washAffectionGain = 1
 )
 
 // Feed raises Hunger, as if the pet just ate.
 func (s *State) Feed() {
 	s.Hunger = (s.Hunger + feedHungerGain).clamp()
+	s.Affection = (s.Affection + feedAffectionGain).clamp()
 }
 
 // Play raises Happiness but costs some Energy, as if the pet just played.
 func (s *State) Play() {
 	s.Happiness = (s.Happiness + playHappinessGain).clamp()
 	s.Energy = (s.Energy - playEnergyCost).clamp()
+	s.Affection = (s.Affection + playAffectionGain).clamp()
 }
 
 // Rest raises Energy, as if the pet just slept.
 func (s *State) Rest() {
 	s.Energy = (s.Energy + restEnergyGain).clamp()
+	s.Affection = (s.Affection + restAffectionGain).clamp()
 }
 
 // Pet gives a small Happiness boost, as if the pet was just petted (e.g.
 // clicked on the desktop overlay). It's lighter-weight than Play.
 func (s *State) Pet() {
 	s.Happiness = (s.Happiness + petHappinessGain).clamp()
+	s.Affection = (s.Affection + petAffectionGain).clamp()
 }
 
 // Wash raises Cleanliness, as if the pet was just bathed/groomed.
 func (s *State) Wash() {
 	s.Cleanliness = (s.Cleanliness + washCleanlinessGain).clamp()
+	s.Affection = (s.Affection + washAffectionGain).clamp()
+}
+
+const (
+	miniGameHappinessPerPoint = 2.5
+	miniGameAffectionPerPoint = 0.8
+)
+
+// PlayMiniGame applies the reward for a completed "catch the hearts"
+// mini-game round, scaled by how many hearts were caught.
+func (s *State) PlayMiniGame(score int) {
+	s.Happiness = (s.Happiness + Stat(float64(score)*miniGameHappinessPerPoint)).clamp()
+	s.Affection = (s.Affection + Stat(float64(score)*miniGameAffectionPerPoint)).clamp()
 }
 
 // dirtyThreshold marks Cleanliness as low enough to be "dirty".
