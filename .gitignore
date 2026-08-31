@@ -1,0 +1,5 @@
+/Elysia Tamagotchi.app/
+*.dSYM/
+/tamagotchi
+/tamagotchi-bin
+.DS_Store
