@@ -40,6 +40,18 @@ var (
 	source *text.GoTextFaceSource
 )
 
+// sizeScale bumps every requested font size up a bit — callers still pass
+// their original logical sizes, so this is a single global "make all text
+// bigger" knob instead of touching every call site.
+const sizeScale = 1.2
+
+// Unscaled converts a logical size back to what it would have rendered at
+// before sizeScale existed, for the few call sites that need to opt out of
+// the global bump (e.g. the stat bar labels, which should stay put).
+func Unscaled(size float64) float64 {
+	return size / sizeScale
+}
+
 func loadSource() {
 	for _, p := range candidatePaths {
 		f, err := os.Open(p)
@@ -64,7 +76,7 @@ func Face(size float64) *text.GoTextFace {
 	if source == nil {
 		return nil
 	}
-	return &text.GoTextFace{Source: source, Size: size}
+	return &text.GoTextFace{Source: source, Size: size * sizeScale}
 }
 
 // boldOffsets are extra (dx, dy) passes drawn on top of the base glyph to
@@ -90,6 +102,7 @@ func drawPasses(dst *ebiten.Image, s string, size, x, y float64, align text.Alig
 	}
 	draw := func(dx, dy float64) {
 		opts := &text.DrawOptions{}
+		opts.Filter = ebiten.FilterLinear
 		opts.GeoM.Translate(x+dx, y+dy)
 		opts.PrimaryAlign = align
 		opts.ColorScale = clr

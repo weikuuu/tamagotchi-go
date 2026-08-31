@@ -16,6 +16,12 @@ import (
 // some encoders emit to mean "as fast as possible".
 const defaultFrameDelay = 100 * time.Millisecond
 
+// minFrameDelay clamps suspiciously tiny declared delays (some sticker
+// packs are authored with a handful of milliseconds per frame, relying on
+// browsers to clamp them the same way) so playback doesn't flicker by way
+// faster than it's meant to.
+const minFrameDelay = 40 * time.Millisecond
+
 // Animation is a decoded, ebiten-ready animated GIF.
 type Animation struct {
 	frames []*ebiten.Image
@@ -48,6 +54,9 @@ func Decode(data []byte) (*Animation, error) {
 		d := defaultFrameDelay
 		if i < len(g.Delay) && g.Delay[i] > 0 {
 			d = time.Duration(g.Delay[i]) * 10 * time.Millisecond
+			if d < minFrameDelay {
+				d = minFrameDelay
+			}
 		}
 		anim.delays = append(anim.delays, d)
 		anim.total += d

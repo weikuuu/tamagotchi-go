@@ -65,8 +65,8 @@ const (
 	// crosses shakeDistanceThreshold, she gets dizzy for dizzyDuration.
 	shakeWindow            = 350 * time.Millisecond
 	shakeDistanceThreshold = 260.0
-	dizzyDuration          = 1400 * time.Millisecond
-	dizzySayCooldown       = 3 * time.Second
+	dizzyDuration          = 3200 * time.Millisecond
+	dizzySayCooldown       = 4 * time.Second
 )
 
 type shakeSample struct {

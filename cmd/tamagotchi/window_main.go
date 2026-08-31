@@ -287,7 +287,19 @@ func (g *mainGame) Update() error {
 }
 
 func (g *mainGame) updateTextInput() {
-	g.inputBuffer += string(ebiten.AppendInputChars(nil))
+	typed := string(ebiten.AppendInputChars(nil))
+	g.inputBuffer += typed
+	if g.editField == "birthday" && typed != "" {
+		digits := 0
+		for _, r := range g.inputBuffer {
+			if r >= '0' && r <= '9' {
+				digits++
+			}
+		}
+		if digits == 2 && !strings.HasSuffix(g.inputBuffer, "-") {
+			g.inputBuffer += "-"
+		}
+	}
 	pasteMod := ebiten.IsKeyPressed(ebiten.KeyControl) || ebiten.IsKeyPressed(ebiten.KeyMeta)
 	if pasteMod && inpututil.IsKeyJustPressed(ebiten.KeyV) {
 		if text, err := clipboard.ReadAll(); err == nil {
@@ -376,12 +388,13 @@ func (g *mainGame) Draw(screen *ebiten.Image) {
 		img := set.Images[variant]
 
 		var yOff float64
-		if now.Before(g.messageUntil) {
+		if sleeping {
+			// Slow, gentle breathing motion while asleep — never the
+			// excited message-bob, even if she just said something.
+			yOff = math.Sin(float64(now.UnixMilli())/1000*1.2) * 3
+		} else if now.Before(g.messageUntil) {
 			amp := bobAmplitude(mood)
 			yOff = math.Sin(time.Since(g.messageStart).Seconds()*6) * amp
-		} else if sleeping {
-			// Slow, gentle breathing motion while asleep.
-			yOff = math.Sin(float64(now.UnixMilli())/1000*1.2) * 3
 		}
 
 		boxW, boxH := float64(g.screenBox.Dx()), float64(g.screenBox.Dy())
@@ -668,7 +681,7 @@ func drawBar(screen *ebiten.Image, label string, frac float64, y int, c color.RG
 		frac = 1
 	}
 	vector.DrawFilledRect(screen, float32(x+2), float32(y+2), float32(frac*(barWidth-4)), float32(barHeight-4), c, true)
-	uifont.Draw(screen, label, 13, float64(x), float64(y-17), inkColor())
+	uifont.Draw(screen, label, uifont.Unscaled(13), float64(x), float64(y-17), inkColor())
 }
 
 func lighten(c color.RGBA) color.RGBA {
