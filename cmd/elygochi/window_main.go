@@ -36,7 +36,7 @@ const (
 	nameZoneWidth     = 96 // right-hand slice of the info bar; click to edit your name
 	settingsZoneWidth = 84 // left-hand slice of the info bar; click to open settings
 
-	nowPlayingY      = infoBarHeight + 4
+	nowPlayingY      = infoBarHeight + 10
 	nowPlayingHeight = 24 // dedicated row for "what's playing", separate from the crowded info bar
 
 	shellWidth = 440 // the elygochi shell art is scaled to this width
@@ -683,15 +683,15 @@ func (g *mainGame) drawBubble(screen *ebiten.Image) {
 
 	ink := bubbleInkColor()
 	if g.bubbleWrapSrc != g.message {
-		g.bubbleWrapLines = uifont.Wrap(g.message, 12, textW)
+		g.bubbleWrapLines = uifont.Wrap(g.message, 11, textW)
 		g.bubbleWrapSrc = g.message
 	}
 	lines := g.bubbleWrapLines
-	lineH := 15.0
+	lineH := 14.0
 	totalH := float64(len(lines)) * lineH
 	textCY := by + float64(tr.Min.Y+tr.Max.Y)/2*scale - totalH/2
 	for i, line := range lines {
-		uifont.DrawCentered(screen, line, 12, textX+textW/2, textCY+float64(i)*lineH, ink)
+		uifont.DrawCentered(screen, line, 11, textX+textW/2, textCY+float64(i)*lineH, ink)
 	}
 }
 
